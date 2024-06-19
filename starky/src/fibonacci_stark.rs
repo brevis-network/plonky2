@@ -200,7 +200,11 @@ mod tests {
 
         println!("proof size: {} bytes {}KB", bincode::serialize(&proof).unwrap().len(), bincode::serialize(&proof).unwrap().len()/1024);
 
-        verify_stark_proof(stark, proof, &config)
+        let start_verify_time = std::time::Instant::now();
+        verify_stark_proof(stark, proof, &config);
+        let verify_duration_ms = start_verify_time.elapsed().as_millis();
+        println!("test_fibonacci_stark verified in {}ms", verify_duration_ms);
+        Ok(())
     }
 
     #[test]
