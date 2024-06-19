@@ -58,7 +58,7 @@ impl<F: RichField + Extendable<D>, const D: usize> FibonacciStark<F, D> {
                 res[0] = acc[0].clone();
                 res[1] = acc[1].clone();
                 res[2] = acc[0].clone()+acc[1].clone();
-                println!("res: {:?}", res);
+                //println!("res: {:?}", res);
 
                 Some(res)
             })
@@ -198,7 +198,7 @@ mod tests {
         let duration_ms = start_time.elapsed().as_millis();
         println!("test_fibonacci_stark proved in {}ms", duration_ms);
 
-        println!("proof size: {} bytes", bincode::serialize(&proof).unwrap().len());
+        println!("proof size: {} bytes {}KB", bincode::serialize(&proof).unwrap().len(), bincode::serialize(&proof).unwrap().len()/1024);
 
         verify_stark_proof(stark, proof, &config)
     }
