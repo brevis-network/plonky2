@@ -47,17 +47,28 @@ impl<F: RichField + Extendable<D>, const D: usize> FibonacciStark<F, D> {
     fn generate_trace(&self, x0: F, x1: F) -> Vec<PolynomialValues<F>> {
         let trace_rows = (0..self.num_rows)
             .scan([x0, x1], |acc, _| {
+                let mut res = [F::ZERO; 3];
+                // println!("acc:{:?}", acc);
                 let tmp = *acc;
                 acc[0] = tmp[1];
                 acc[1] = tmp[0] + tmp[1];
-                Some(tmp)
+
+                res[0] = acc[0].clone();
+                res[1] = acc[1].clone();
+                res[2] = acc[0].clone()+acc[1].clone();
+                println!("res: {:?}", res);
+
+                Some(res)
             })
             .collect::<Vec<_>>();
+        // let trace_rows = (0..self.num_rows)
+        //     .into_iter().for_each(|row| {
+        // });
         trace_rows_to_poly_values(trace_rows)
     }
 }
 
-const FIBONACCI_COLUMNS: usize = 2;
+const FIBONACCI_COLUMNS: usize = 3;
 const FIBONACCI_PUBLIC_INPUTS: usize = 3;
 
 impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStark<F, D> {
@@ -86,14 +97,13 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         let public_inputs = vars.get_public_inputs();
 
         // Check public inputs.
-        yield_constr.constraint_first_row(local_values[0] - public_inputs[Self::PI_INDEX_X0]);
+        yield_constr.constraint_first_row(local_values[0] - public_inputs[Self::PI_INDEX_X1]);
         yield_constr.constraint_first_row(local_values[1] - public_inputs[Self::PI_INDEX_X1]);
-        yield_constr.constraint_last_row(local_values[1] - public_inputs[Self::PI_INDEX_RES]);
 
-        // x0' <- x1
+        yield_constr.constraint(local_values[0] + local_values[1] - local_values[2]);
+
         yield_constr.constraint_transition(next_values[0] - local_values[1]);
-        // x1' <- x0 + x1
-        yield_constr.constraint_transition(next_values[1] - local_values[0] - local_values[1]);
+        yield_constr.constraint_transition(next_values[1] - local_values[2]);
     }
 
     fn eval_ext_circuit(
@@ -107,23 +117,26 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         let public_inputs = vars.get_public_inputs();
         // Check public inputs.
         let pis_constraints = [
-            builder.sub_extension(local_values[0], public_inputs[Self::PI_INDEX_X0]),
+            builder.sub_extension(local_values[0], public_inputs[Self::PI_INDEX_X1]),
             builder.sub_extension(local_values[1], public_inputs[Self::PI_INDEX_X1]),
-            builder.sub_extension(local_values[1], public_inputs[Self::PI_INDEX_RES]),
+            // builder.sub_extension(local_values[1], public_inputs[Self::PI_INDEX_RES]),
         ];
         yield_constr.constraint_first_row(builder, pis_constraints[0]);
         yield_constr.constraint_first_row(builder, pis_constraints[1]);
-        yield_constr.constraint_last_row(builder, pis_constraints[2]);
+        // yield_constr.constraint_last_row(builder, pis_constraints[2]);
 
-        // x0' <- x1
         let first_col_constraint = builder.sub_extension(next_values[0], local_values[1]);
         yield_constr.constraint_transition(builder, first_col_constraint);
-        // x1' <- x0 + x1
-        let second_col_constraint = {
-            let tmp = builder.sub_extension(next_values[1], local_values[0]);
-            builder.sub_extension(tmp, local_values[1])
-        };
+
+        let second_col_constraint = builder.sub_extension(next_values[1], local_values[2]);
         yield_constr.constraint_transition(builder, second_col_constraint);
+        //
+        let third_col_constraint = {
+            let tmp = builder.add_extension(local_values[0], local_values[1]);
+            builder.sub_extension(tmp, local_values[2])
+        };
+        yield_constr.constraint(builder, third_col_constraint);
+        //
     }
 
     fn constraint_degree(&self) -> usize {
@@ -167,7 +180,7 @@ mod tests {
         type S = FibonacciStark<F, D>;
 
         let config = StarkConfig::standard_fast_config();
-        let num_rows = 1 << 5;
+        let num_rows = 1 << 6;
         let public_inputs = [F::ZERO, F::ONE, fibonacci(num_rows - 1, F::ZERO, F::ONE)];
 
         let stark = S::new(num_rows);
