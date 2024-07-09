@@ -19,6 +19,8 @@ use crate::stark::Stark;
 pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
     stark: &S,
     vars: &S::EvaluationFrame<FE, P, D2>,
+    p2_vars: Option<S::P2EvaluationFrame<FE, P, D2>>,
+    random_gamma: Option<&FE>,
     lookups: &[Lookup<F>],
     lookup_vars: Option<LookupCheckVars<F, FE, P, D2>>,
     ctl_vars: Option<&[CtlCheckVars<F, FE, P, D2>]>,
@@ -31,6 +33,9 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
 {
     // Evaluate all of the STARK's table constraints.
     stark.eval_packed_generic(vars, consumer);
+    if let Some(p2_vars) = p2_vars {
+        stark.eval_p2_packed_generic(vars, &p2_vars, random_gamma.unwrap().clone(), consumer);
+    }
     if let Some(lookup_vars) = lookup_vars {
         // Evaluate the STARK constraints related to the permutation arguments.
         eval_packed_lookups_generic::<F, FE, P, S, D, D2>(
@@ -50,6 +55,7 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
             stark.constraint_degree(),
         );
     }
+
 }
 
 /// Circuit version of `eval_vanishing_poly`.

@@ -36,6 +36,15 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate constraints recursively.
     type EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
 
+    /// This is used to phase 2 evaluate constraints natively.
+    type P2EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
+    where
+        FE: FieldExtension<D2, BaseField = F>,
+        P: PackedField<Scalar = FE>;
+
+    /// The `Target` version of `Self::EvaluationFrame`, used to evaluate phase 2 constraints recursively.
+    type P2EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
+
     /// Evaluates constraints at a vector of points.
     ///
     /// The points are elements of a field `FE`, a degree `D2` extension of `F`. This lets us
@@ -49,6 +58,19 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>;
+
+    /// This is like `eval_packed_generic`, Evaluates constraints at a vector of points for phase 2.
+    fn eval_p2_packed_generic<FE, P, const D2: usize>(
+        &self,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: &Self::P2EvaluationFrame<FE, P, D2>,
+        random_gamma: FE,
+        yield_constr: &mut ConstraintConsumer<P>,
+    ) where
+        FE: FieldExtension<D2, BaseField = F>,
+        P: PackedField<Scalar = FE>,
+    {
+    }
 
     /// Evaluates constraints at a vector of points from the base field `F`.
     fn eval_packed_base<P: PackedField<Scalar = F>>(
@@ -78,6 +100,17 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrameTarget,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     );
+
+    /// Evaluates constraints at a vector of points from the degree `D` extension field for phase 2
+    /// .This is like `eval_ext_circuit`
+    fn eval_p2_ext_circuit(
+        &self,
+        builder: &mut CircuitBuilder<F, D>,
+        vars: &Self::EvaluationFrameTarget,
+        random_gamma: &F,
+        yield_constr: &mut RecursiveConstraintConsumer<F, D>,
+    ) {
+    }
 
     /// Outputs the maximum constraint degree of this [`Stark`].
     fn constraint_degree(&self) -> usize;
