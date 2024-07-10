@@ -96,6 +96,8 @@ pub fn verify_stark_proof_with_challenges_circuit<
     let StarkOpeningSetTarget {
         local_values,
         next_values,
+        p2_local_values,
+        p2_next_values,
         auxiliary_polys,
         auxiliary_polys_next,
         ctl_zs_first,
@@ -297,6 +299,12 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
     StarkOpeningSetTarget {
         local_values: builder.add_virtual_extension_targets(S::COLUMNS),
         next_values: builder.add_virtual_extension_targets(S::COLUMNS),
+        p2_local_values: (stark
+            .use_phase2()
+            .then(|| builder.add_virtual_extension_targets(S::P2_COLUMNS))),
+        p2_next_values: (stark
+            .use_phase2()
+            .then(|| builder.add_virtual_extension_targets(S::P2_COLUMNS))),
         auxiliary_polys: (stark.uses_lookups() || stark.requires_ctls()).then(|| {
             builder.add_virtual_extension_targets(
                 stark.num_lookup_helper_columns(config) + num_ctl_helper_zs,

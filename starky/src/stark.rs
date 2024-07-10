@@ -27,6 +27,11 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// The total number of public inputs.
     const PUBLIC_INPUTS: usize = Self::EvaluationFrameTarget::PUBLIC_INPUTS;
 
+    /// The total number of columns in the phase 2 trace.
+    const P2_COLUMNS: usize = Self::P2EvaluationFrameTarget::COLUMNS;
+    /// The total number of public inputs in the phase 2 trace.
+    const P2_PUBLIC_INPUTS: usize = Self::P2EvaluationFrameTarget::PUBLIC_INPUTS;
+
     /// This is used to evaluate constraints natively.
     type EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
     where
@@ -306,5 +311,10 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// It defaults to `false`, i.e. for simple uni-STARK systems.
     fn requires_ctls(&self) -> bool {
         false
+    }
+
+    /// if 2 phase trace is enable
+    fn use_phase2(&self) -> bool {
+        Self::P2_COLUMNS > 0
     }
 }

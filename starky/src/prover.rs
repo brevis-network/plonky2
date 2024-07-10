@@ -307,6 +307,7 @@ where
         zeta,
         g,
         trace_commitment,
+        p2_trace_commitment,
         auxiliary_polys_commitment.as_ref(),
         quotient_commitment.as_ref(),
         stark.num_lookup_helper_columns(config),
@@ -333,8 +334,18 @@ where
         )
     );
 
+    let p2_trace_cap = if p2_trace_commitment.is_none() {
+        None
+    } else {
+        Some(p2_trace_commitment.unwrap().merkle_tree.cap.clone())
+    };
+
+    if let Some(p2_trace_commitment) = p2_trace_commitment {
+    }
+
     let proof = StarkProof {
         trace_cap: trace_commitment.merkle_tree.cap.clone(),
+        p2_trace_cap,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings,
@@ -447,15 +458,9 @@ where
                 S::P2EvaluationFrame::from_values(
                     &get_p2_trace_values_packed(i_start),
                     &get_p2_trace_values_packed(i_next_start),
-                    &[],
+                    &[], // todo: support public inputs in phase 2
                 )
             });
-
-            let p2_vars_temp = S::P2EvaluationFrame::from_values(
-                &get_p2_trace_values_packed(i_start),
-                &get_p2_trace_values_packed(i_next_start),
-                &[],
-            );
 
             // Get the local and next row evaluations for the permutation argument,
             // as well as the associated challenges.

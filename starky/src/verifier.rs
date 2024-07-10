@@ -91,6 +91,8 @@ where
     let StarkOpeningSet {
         local_values,
         next_values,
+        p2_local_values,
+        p2_next_values,
         auxiliary_polys,
         auxiliary_polys_next,
         ctl_zs_first: _,
@@ -106,6 +108,16 @@ where
             .map(F::Extension::from_basefield)
             .collect::<Vec<_>>(),
     );
+
+    let p2_vars = if stark.use_phase2() {
+        Some(S::P2EvaluationFrame::from_values(
+            p2_local_values.as_ref().unwrap(),
+            p2_next_values.as_ref().unwrap(),
+            &[], // todo: support public input in phase 2
+        ))
+    } else {
+        None
+    };
 
     let degree_bits = proof.recover_degree_bits(config);
     let (l_0, l_last) = eval_l_0_and_l_last(degree_bits, challenges.stark_zeta);
@@ -149,8 +161,8 @@ where
     eval_vanishing_poly::<F, F::Extension, F::Extension, S, D, D>(
         stark,
         &vars,
-        None,
-        None,
+        p2_vars,
+        challenges.random_gamma.as_ref(),
         &lookups,
         lookup_vars,
         ctl_vars,
@@ -226,6 +238,7 @@ where
 
     let StarkProof {
         trace_cap,
+        p2_trace_cap,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings,
@@ -237,6 +250,8 @@ where
     let StarkOpeningSet {
         local_values,
         next_values,
+        p2_local_values,
+        p2_next_values,
         auxiliary_polys,
         auxiliary_polys_next,
         ctl_zs_first,
