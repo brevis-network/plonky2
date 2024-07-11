@@ -112,7 +112,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         &self,
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
-        random_gamma: &F,
+        p2_vars: &Self::P2EvaluationFrameTarget,
+        random_gamma: &ExtensionTarget<D>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
     }

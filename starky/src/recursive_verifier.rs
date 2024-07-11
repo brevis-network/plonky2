@@ -113,6 +113,14 @@ pub fn verify_stark_proof_with_challenges_circuit<
             .collect::<Vec<_>>(),
     );
 
+    let p2_vars =  (!p2_local_values.is_none() && !p2_next_values.is_none()).then(|| {
+            S::P2EvaluationFrameTarget::from_values(
+            p2_local_values.as_ref().unwrap(),
+            p2_next_values.as_ref().unwrap(),
+            &[],
+            )
+    });
+
     let degree_bits = proof.recover_degree_bits(inner_config);
     let zeta_pow_deg = builder.exp_power_of_2_extension(challenges.stark_zeta, degree_bits);
     let z_h_zeta = builder.sub_extension(zeta_pow_deg, one);
@@ -155,6 +163,8 @@ pub fn verify_stark_proof_with_challenges_circuit<
             builder,
             stark,
             &vars,
+            p2_vars,
+            challenges.random_gamma.clone(),
             lookup_vars,
             ctl_vars,
             &mut consumer
@@ -268,6 +278,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
         )
         .collect_vec();
 
+    let p2_trace_cap = stark.use_phase2().then(|| builder.add_virtual_cap(cap_height));
+
     let auxiliary_polys_cap = (stark.uses_lookups() || stark.requires_ctls())
         .then(|| builder.add_virtual_cap(cap_height));
 
@@ -276,6 +288,7 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 
     StarkProofTarget {
         trace_cap: builder.add_virtual_cap(cap_height),
+        p2_trace_cap,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings: add_virtual_stark_opening_set::<F, S, D>(
@@ -368,6 +381,9 @@ pub fn set_stark_proof_target<F, C: GenericConfig<D, F = F>, W, const D: usize>(
     W: WitnessWrite<F>,
 {
     witness.set_cap_target(&proof_target.trace_cap, &proof.trace_cap);
+    if let (Some(p2_target_trace_cap), Some(p2_trace_cap)) = (&proof_target.p2_trace_cap, &proof.p2_trace_cap) {
+        witness.set_cap_target(p2_target_trace_cap, p2_trace_cap);
+    }
     if let (Some(quotient_polys_cap_target), Some(quotient_polys_cap)) =
         (&proof_target.quotient_polys_cap, &proof.quotient_polys_cap)
     {

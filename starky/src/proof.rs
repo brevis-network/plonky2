@@ -60,6 +60,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize> S
 pub struct StarkProofTarget<const D: usize> {
     /// `Target` for the Merkle cap trace values LDEs.
     pub trace_cap: MerkleCapTarget,
+    /// `Target` for the Merkle cap phase 2 trace values LDEs.
+    pub p2_trace_cap: Option<MerkleCapTarget>,
     /// Optional `Target` for the Merkle cap of lookup helper and CTL columns LDEs, if any.
     pub auxiliary_polys_cap: Option<MerkleCapTarget>,
     /// `Target` for the Merkle cap of quotient polynomial evaluations LDEs.
@@ -90,6 +92,11 @@ impl<const D: usize> StarkProofTarget<D> {
     /// Deserializes a STARK proof.
     pub fn from_buffer(buffer: &mut Buffer) -> IoResult<Self> {
         let trace_cap = buffer.read_target_merkle_cap()?;
+        let p2_trace_cap = if buffer.read_bool()? {
+            Some(buffer.read_target_merkle_cap()?)
+        } else {
+            None
+        };
         let auxiliary_polys_cap = if buffer.read_bool()? {
             Some(buffer.read_target_merkle_cap()?)
         } else {
@@ -105,6 +112,7 @@ impl<const D: usize> StarkProofTarget<D> {
 
         Ok(Self {
             trace_cap,
+            p2_trace_cap,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -232,7 +240,7 @@ pub struct StarkProofChallenges<F: RichField + Extendable<D>, const D: usize> {
 #[derive(Debug)]
 pub struct StarkProofChallengesTarget<const D: usize> {
     /// Optional randomness used in 2-phase trace values RLC
-    pub random_gamma: Option<Target>,
+    pub random_gamma: Option<ExtensionTarget<D>>,
     /// Optional `Target`'s randomness used in any permutation argument.
     pub lookup_challenge_set: Option<GrandProductChallengeSet<Target>>,
     /// `Target`s for the random values used to combine STARK constraints.
