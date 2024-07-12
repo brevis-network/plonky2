@@ -72,6 +72,13 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         FIBONACCI_COLUMNS,
         FIBONACCI_PUBLIC_INPUTS,
     >;
+    type P2EvaluationFrame<FE, P, const D2: usize> where FE: FieldExtension<D2, BaseField=F>, P: PackedField<Scalar=FE> = StarkFrame<P, P::Scalar, 0, 0>;
+    type P2EvaluationFrameTarget = StarkFrame<
+        ExtensionTarget<D>,
+        ExtensionTarget<D>,
+        0,
+        0,
+    >;
 
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,

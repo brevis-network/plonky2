@@ -3,7 +3,6 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
-
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::field::types::Field;
@@ -17,8 +16,9 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 
 use crate::config::StarkConfig;
 use crate::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
-use crate::evaluation_frame::StarkEvaluationFrame;
+use crate::evaluation_frame::{StarkEvaluationFrame};
 use crate::lookup::Lookup;
+
 
 /// Represents a STARK system.
 pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
@@ -45,7 +45,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     type P2EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
     where
         FE: FieldExtension<D2, BaseField = F>,
-        P: PackedField<Scalar = FE>;
+        P: PackedField<Scalar = FE> ;
 
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate phase 2 constraints recursively.
     type P2EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
