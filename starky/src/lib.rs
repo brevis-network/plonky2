@@ -337,6 +337,10 @@ pub mod stark_testing;
 pub mod util;
 mod vanishing_poly;
 pub mod verifier;
+pub mod xor_chip;
+pub mod byte_chip;
+pub mod aggregation;
+
 
 #[cfg(test)]
 pub mod fibonacci_stark;
@@ -344,3 +348,5 @@ pub mod fibonacci_stark;
 pub mod permutation_stark;
 #[cfg(test)]
 pub mod unconstrained_stark;
+#[cfg(test)]
+pub mod tests;
