@@ -87,8 +87,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
     // We don't constrain any register, for the sake of highlighting the permutation argument only.
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
-        _vars: &Self::EvaluationFrame<FE, P, D2>,
-        _yield_constr: &mut ConstraintConsumer<P>,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
+        yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>,
@@ -98,9 +100,11 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
     // We don't constrain any register, for the sake of highlighting the permutation argument only.
     fn eval_ext_circuit(
         &self,
-        _builder: &mut CircuitBuilder<F, D>,
-        _vars: &Self::EvaluationFrameTarget,
-        _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
+        builder: &mut CircuitBuilder<F, D>,
+        vars: &Self::EvaluationFrameTarget,
+        p2_vars: Option<Self::P2EvaluationFrameTarget>,
+        random_gamma: Option<ExtensionTarget<D>>,
+        yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
     }
 }

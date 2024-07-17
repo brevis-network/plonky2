@@ -33,10 +33,7 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
     S: Stark<F, D>,
 {
     // Evaluate all of the STARK's table constraints.
-    stark.eval_packed_generic(vars, consumer);
-    if let Some(p2_vars) = p2_vars {
-        stark.eval_p2_packed_generic(vars, &p2_vars, random_gamma.unwrap().clone(), consumer);
-    }
+    stark.eval_packed_generic(vars, p2_vars, random_gamma, consumer);
     if let Some(lookup_vars) = lookup_vars {
         // Evaluate the STARK constraints related to the permutation arguments.
         eval_packed_lookups_generic::<F, FE, P, S, D, D2>(
@@ -76,10 +73,7 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
     S: Stark<F, D>,
 {
     // Evaluate all of the STARK's table constraints.
-    stark.eval_ext_circuit(builder, vars, consumer);
-    if let Some(p2_vars) = p2_vars {
-        stark.eval_p2_ext_circuit(builder, vars, &p2_vars,random_gamma.as_ref().unwrap(), consumer);
-    }
+    stark.eval_ext_circuit(builder,vars, p2_vars, random_gamma, consumer);
     if let Some(lookup_vars) = lookup_vars {
         // Evaluate all of the STARK's constraints related to the permutation argument.
         eval_ext_lookups_circuit::<F, S, D>(builder, stark, vars, lookup_vars, consumer);

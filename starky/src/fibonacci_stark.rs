@@ -80,9 +80,12 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         0,
     >;
 
+
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
@@ -107,6 +110,8 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         &self,
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
+        _p2_vars: Option<Self::P2EvaluationFrameTarget>,
+        _random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
         let local_values = vars.get_local_values();

@@ -59,23 +59,12 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>;
-
-    /// This is like `eval_packed_generic`, Evaluates constraints at a vector of points for phase 2.
-    fn eval_p2_packed_generic<FE, P, const D2: usize>(
-        &self,
-        vars: &Self::EvaluationFrame<FE, P, D2>,
-        p2_vars: &Self::P2EvaluationFrame<FE, P, D2>,
-        random_gamma: FE,
-        yield_constr: &mut ConstraintConsumer<P>,
-    ) where
-        FE: FieldExtension<D2, BaseField = F>,
-        P: PackedField<Scalar = FE>,
-    {
-    }
 
     /// Evaluates constraints at a vector of points from the base field `F`.
     fn eval_packed_base<P: PackedField<Scalar = F>>(
@@ -83,7 +72,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F, P, 1>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) {
-        self.eval_packed_generic(vars, yield_constr)
+        self.eval_packed_generic(vars,None, None, yield_constr)
     }
 
     /// Evaluates constraints at a single point from the degree `D` extension field.
@@ -92,7 +81,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F::Extension, F::Extension, D>,
         yield_constr: &mut ConstraintConsumer<F::Extension>,
     ) {
-        self.eval_packed_generic(vars, yield_constr)
+        self.eval_packed_generic(vars, None, None, yield_constr)
     }
 
     /// Evaluates constraints at a vector of points from the degree `D` extension field.
@@ -103,20 +92,10 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         &self,
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
+        p2_vars: Option<Self::P2EvaluationFrameTarget>,
+        random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     );
-
-    /// Evaluates constraints at a vector of points from the degree `D` extension field for phase 2
-    /// .This is like `eval_ext_circuit`
-    fn eval_p2_ext_circuit(
-        &self,
-        builder: &mut CircuitBuilder<F, D>,
-        vars: &Self::EvaluationFrameTarget,
-        p2_vars: &Self::P2EvaluationFrameTarget,
-        random_gamma: &ExtensionTarget<D>,
-        yield_constr: &mut RecursiveConstraintConsumer<F, D>,
-    ) {
-    }
 
     /// Outputs the maximum constraint degree of this [`Stark`].
     fn constraint_degree(&self) -> usize;
