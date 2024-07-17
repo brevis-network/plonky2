@@ -2,8 +2,12 @@
 use alloc::vec::Vec;
 
 use anyhow::ensure;
+use num_bigint::BigInt;
+use core::str::{self, FromStr};
+use std::hash::Hash;
+use std::ops::{Shl, Shr};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
+use serde::ser::SerializeStruct;
 use crate::field::goldilocks_field::GoldilocksField;
 use crate::field::types::{Field, PrimeField64, Sample};
 use crate::hash::poseidon::Poseidon;
@@ -18,10 +22,30 @@ impl RichField for GoldilocksField {}
 pub const NUM_HASH_OUT_ELTS: usize = 4;
 
 /// Represents a ~256 bit hash output.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Deserialize)]
 #[serde(bound = "")]
 pub struct HashOut<F: Field> {
     pub elements: [F; NUM_HASH_OUT_ELTS],
+}
+
+/// convert field elements to one bigInt
+impl<F: Field> Serialize for HashOut<F>  {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+
+        let mut result = BigInt::from(0);
+        for (i, &element) in self.elements.iter().enumerate() {
+            let shift_amount = F::BITS * i;
+            let a = element.to_string();
+            //println!("{}", a);
+            let part_bigint = BigInt::from_str(&a).unwrap();
+            let shifted_part = part_bigint.shl(shift_amount);
+            result += shifted_part;
+        }
+        serializer.serialize_str(&result.to_string())
+    }
 }
 
 impl<F: Field> HashOut<F> {

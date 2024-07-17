@@ -13,9 +13,10 @@ use plonky2::field::types::Field;
 use plonky2::fri::reduction_strategies::FriReductionStrategy;
 use plonky2::fri::{FriConfig, FriParams};
 use plonky2::hash::hash_types::RichField;
+use serde::Serialize;
 
 /// A configuration containing the different parameters used by the STARK prover.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct StarkConfig {
     /// The targeted security level for the proofs generated with this configuration.
     pub security_bits: usize,

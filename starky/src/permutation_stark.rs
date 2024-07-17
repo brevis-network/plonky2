@@ -101,12 +101,13 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
 mod tests {
     use anyhow::Result;
     use plonky2::field::extension::Extendable;
+    use plonky2::field::goldilocks_field::GoldilocksField;
     use plonky2::field::types::Field;
     use plonky2::hash::hash_types::RichField;
     use plonky2::iop::witness::PartialWitness;
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::CircuitConfig;
-    use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, PoseidonGoldilocksConfig};
+    use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, GenericHashOut, PoseidonGoldilocksConfig};
     use plonky2::util::timing::TimingTree;
 
     use crate::config::StarkConfig;
@@ -227,7 +228,22 @@ mod tests {
 
         let data = builder.build::<C>();
         let proof = data.prove(pw)?;
-        data.verify(proof)
+
+        println!("recursion done");
+
+        //std::fs::write("proof_with_public_inputs.json", serde_json::to_string_pretty(&proof).unwrap(), ).unwrap();
+        //std::fs::write("common_circuit_data.json", serde_json::to_string_pretty(&data.common).unwrap(), ).unwrap();
+        //std::fs::write("verifier_only_circuit_data.json", serde_json::to_string_pretty(&data.verifier_only).unwrap(), ).unwrap();
+
+        //println!("{:?}", data.verifier_only.circuit_digest);
+        //println!("", data.verifier_only.circuit_digest)
+
+        data.verify(proof);
+
+        // try to do wrapper
+
+
+        Ok(())
     }
 
     fn init_logger() {
