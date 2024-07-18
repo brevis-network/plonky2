@@ -334,6 +334,7 @@
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 extern crate core;
+extern crate core;
 
 mod get_challenges;
 
