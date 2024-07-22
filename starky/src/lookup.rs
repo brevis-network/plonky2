@@ -304,7 +304,6 @@ impl<F: Field> Column<F> {
         } else {
             vs.extend(v);
         }
-        assert_eq!(vs.len(), self.linear_combination.len());
         self.linear_combination
             .iter()
             .map(|&(c, f)| vs[c] * FE::from_basefield(f))
@@ -327,8 +326,6 @@ impl<F: Field> Column<F> {
             local_vs.extend(v);
             next_vs.extend(next_v);
         }
-        assert_eq!(self.linear_combination.len(), local_vs.len());
-        assert_eq!(self.linear_combination.len(), next_vs.len());
         self.linear_combination
             .iter()
             .map(|&(c, f)| local_vs[c] * FE::from_basefield(f))
@@ -349,7 +346,6 @@ impl<F: Field> Column<F> {
         } else {
             table_vals.extend(table);
         }
-        assert_eq!(table_vals.len(), self.linear_combination.len());
         self.linear_combination
             .iter()
             .map(|&(c, f)| table_vals[c].values[row] * f)
