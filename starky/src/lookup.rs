@@ -297,9 +297,10 @@ impl<F: Field> Column<F> {
         FE: FieldExtension<D, BaseField = F>,
         P: PackedField<Scalar = FE>,
     {
-        let mut vs = vec![];
+        let mut vs: Vec<P> = Vec::new();
         if let Some(p2_v) = p2_v {
-            vs.extend(v.iter().chain(p2_v.iter()).collect_vec());
+            let full_v=  v.iter().chain(p2_v.iter()).collect_vec();
+            vs.extend(full_v);
         } else {
             vs.extend(v);
         }
@@ -317,8 +318,8 @@ impl<F: Field> Column<F> {
         FE: FieldExtension<D, BaseField = F>,
         P: PackedField<Scalar = FE>,
     {
-        let mut local_vs = vec![];
-        let mut next_vs = vec![];
+        let mut local_vs: Vec<P> = Vec::new();
+        let mut next_vs: Vec<P> = Vec::new();
         if let (Some(p2_v), Some(p2_next_v)) = (p2_v, p2_next_v) {
             local_vs.extend(v.iter().chain(p2_v.iter()).collect_vec());
             next_vs.extend(next_v.iter().chain(p2_next_v.iter()).collect_vec());
@@ -866,7 +867,7 @@ pub(crate) fn eval_packed_lookups_generic<F, FE, P, S, const D: usize, const D2:
     stark: &S,
     lookups: &[Lookup<F>],
     vars: &S::EvaluationFrame<FE, P, D2>,
-    p2_vars: Option<&S::EvaluationFrame<FE, P, D2>>,
+    p2_vars: Option<&S::P2EvaluationFrame<FE, P, D2>>,
     lookup_vars: LookupCheckVars<F, FE, P, D2>,
     yield_constr: &mut ConstraintConsumer<P>,
 ) where
@@ -945,7 +946,7 @@ pub(crate) fn eval_ext_lookups_circuit<
     builder: &mut CircuitBuilder<F, D>,
     stark: &S,
     vars: &S::EvaluationFrameTarget,
-    p2_vars: Option<&S::EvaluationFrameTarget>,
+    p2_vars: Option<&S::P2EvaluationFrameTarget>,
     lookup_vars: LookupCheckVarsTarget<D>,
     yield_constr: &mut RecursiveConstraintConsumer<F, D>,
 ) {

@@ -161,7 +161,7 @@ where
     eval_vanishing_poly::<F, F::Extension, F::Extension, S, D, D>(
         stark,
         &vars,
-        p2_vars,
+        p2_vars.as_ref(),
         challenges.random_gamma.as_ref(),
         &lookups,
         lookup_vars,

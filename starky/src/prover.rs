@@ -156,6 +156,7 @@ where
                     columns.extend(lookup_helper_columns(
                         lookup,
                         trace_poly_values,
+                        p2_trace_poly_values,
                         challenge,
                         constraint_degree,
                     ));
@@ -454,13 +455,16 @@ where
                 public_inputs,
             );
 
-            let p2_vars = p2_trace_commit.map(|_| {
-                S::P2EvaluationFrame::from_values(
+            let mut p2_frame = None;
+            if p2_trace_commit.is_some() {
+                p2_frame = Some(S::P2EvaluationFrame::from_values(
                     &get_p2_trace_values_packed(i_start),
                     &get_p2_trace_values_packed(i_next_start),
                     &[], // todo: support public inputs in phase 2
-                )
-            });
+                ));
+            }
+
+            let p2_vars = p2_frame.as_ref();
 
             // Get the local and next row evaluations for the permutation argument,
             // as well as the associated challenges.
@@ -648,13 +652,20 @@ fn check_constraints<'a, F, C, S, const D: usize>(
                 public_inputs,
             );
 
-            let p2_vars = p2_trace_commitment.clone().map(|_| {
-                S::P2EvaluationFrame::from_values(
-                    &p2_trace_subgroup_evals.clone().unwrap()[i],
-                    &p2_trace_subgroup_evals.clone().unwrap()[i_next],
-                    &[],
-                )
-            });
+            let mut p2_evaluation_frame = None;
+
+            if p2_trace_commitment.clone().is_some() {
+                p2_evaluation_frame = Some(
+                    S::P2EvaluationFrame::from_values(
+                        &p2_trace_subgroup_evals.clone().unwrap()[i],
+                        &p2_trace_subgroup_evals.clone().unwrap()[i_next],
+                        &[],
+                    )
+                );
+            }
+
+            let p2_vars = p2_evaluation_frame.as_ref();
+
             // Get the local and next row evaluations for the current STARK's permutation argument.
             let lookup_vars = lookup_challenges.map(|challenges| LookupCheckVars {
                 local_values: auxiliary_subgroup_evals.as_ref().unwrap()[i][..num_lookup_columns]

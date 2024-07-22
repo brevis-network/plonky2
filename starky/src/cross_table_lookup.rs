@@ -227,6 +227,7 @@ impl<'a, F: Field> CtlData<'a, F> {
 pub fn get_ctl_data<'a, F, C, const D: usize, const N: usize>(
     config: &StarkConfig,
     trace_poly_values: &[Vec<PolynomialValues<F>>; N],
+    p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>; N]>,
     all_cross_table_lookups: &'a [CrossTableLookup<F>],
     challenger: &mut Challenger<F, C::Hasher>,
     max_constraint_degree: usize,
@@ -242,6 +243,7 @@ where
     // and get the associated `CtlData`.
     let ctl_data = cross_table_lookup_data::<F, D, N>(
         trace_poly_values,
+        p2_trace_poly_values,
         all_cross_table_lookups,
         &ctl_challenges,
         max_constraint_degree,
@@ -322,6 +324,7 @@ pub(crate) fn get_ctl_auxiliary_polys<F: Field>(
 /// For each `CrossTableLookup`, and each looking/looked table, the partial products for the CTL are computed, and added to the said table's `CtlZData`.
 pub(crate) fn cross_table_lookup_data<'a, F: RichField, const D: usize, const N: usize>(
     trace_poly_values: &[Vec<PolynomialValues<F>>; N],
+    p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>; N]>,
     cross_table_lookups: &'a [CrossTableLookup<F>],
     ctl_challenges: &GrandProductChallengeSet<F>,
     constraint_degree: usize,
@@ -336,13 +339,17 @@ pub(crate) fn cross_table_lookup_data<'a, F: RichField, const D: usize, const N:
         for &challenge in &ctl_challenges.challenges {
             let helper_zs_looking = ctl_helper_zs_cols(
                 trace_poly_values,
+                p2_trace_poly_values,
                 looking_tables.clone(),
                 challenge,
                 constraint_degree,
             );
 
+            let p2_trace = p2_trace_poly_values.is_some().then(|| p2_trace_poly_values.unwrap()[looked_table.table].as_ref());
+
             let z_looked = partial_sums(
                 &trace_poly_values[looked_table.table],
+                p2_trace,
                 &[(&looked_table.columns, &looked_table.filter)],
                 challenge,
                 constraint_degree,
@@ -395,6 +402,7 @@ pub(crate) fn cross_table_lookup_data<'a, F: RichField, const D: usize, const N:
 /// of one cross-table lookup (i.e. for one looked table).
 fn ctl_helper_zs_cols<F: Field, const N: usize>(
     all_stark_traces: &[Vec<PolynomialValues<F>>; N],
+    all_p2_stark_traces: Option<&[Vec<PolynomialValues<F>>; N]>,
     looking_tables: Vec<TableWithColumns<F>>,
     challenge: GrandProductChallenge<F>,
     constraint_degree: usize,
@@ -404,6 +412,9 @@ fn ctl_helper_zs_cols<F: Field, const N: usize>(
     grouped_lookups
         .into_iter()
         .map(|(table, group)| {
+            let all_p2_stark_traces = all_p2_stark_traces.is_some()
+                .then(|| all_p2_stark_traces.unwrap()[table].as_ref());
+
             let columns_filters = group
                 .map(|table| (&table.columns[..], &table.filter))
                 .collect::<Vec<(&[Column<F>], &Filter<F>)>>();
@@ -411,6 +422,7 @@ fn ctl_helper_zs_cols<F: Field, const N: usize>(
                 table,
                 partial_sums(
                     &all_stark_traces[table],
+                    all_p2_stark_traces,
                     &columns_filters,
                     challenge,
                     constraint_degree,
@@ -435,6 +447,7 @@ fn ctl_helper_zs_cols<F: Field, const N: usize>(
 /// Returns the helper columns and `z`.
 fn partial_sums<F: Field>(
     trace: &[PolynomialValues<F>],
+    p2_trace: Option<&[PolynomialValues<F>]>,
     columns_filters: &[ColumnFilter<F>],
     challenge: GrandProductChallenge<F>,
     constraint_degree: usize,
@@ -443,7 +456,7 @@ fn partial_sums<F: Field>(
     let mut z = Vec::with_capacity(degree);
 
     let mut helper_columns =
-        get_helper_cols(trace, degree, columns_filters, challenge, constraint_degree);
+        get_helper_cols(trace,p2_trace, degree, columns_filters, challenge, constraint_degree);
 
     let x = helper_columns
         .iter()
@@ -631,6 +644,7 @@ impl<'a, F: RichField + Extendable<D>, const D: usize>
 /// and not the next. This enables CTLs across two rows.
 pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const D2: usize>(
     vars: &S::EvaluationFrame<FE, P, D2>,
+    p2_vars: Option<&S::P2EvaluationFrame<FE, P, D2>>,
     ctl_vars: &[CtlCheckVars<F, FE, P, D2>],
     consumer: &mut ConstraintConsumer<P>,
     constraint_degree: usize,
@@ -642,6 +656,9 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
 {
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
+
+    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
+    let p2_next_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_next_values());
 
     for lookup_vars in ctl_vars {
         let CtlCheckVars {
@@ -658,7 +675,7 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             .iter()
             .map(|col| {
                 col.iter()
-                    .map(|c| c.eval_with_next(local_values, next_values))
+                    .map(|c| c.eval_with_next(local_values, next_values, p2_local_values, p2_next_values))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -669,6 +686,8 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             &evals,
             local_values,
             next_values,
+            p2_local_values,
+            p2_next_values,
             helper_columns,
             constraint_degree,
             challenges,
@@ -685,8 +704,8 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             let combin0 = challenges.combine(&evals[0]);
             let combin1 = challenges.combine(&evals[1]);
 
-            let f0 = filter[0].eval_filter(local_values, next_values);
-            let f1 = filter[1].eval_filter(local_values, next_values);
+            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
+            let f1 = filter[1].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
 
             consumer
                 .constraint_last_row(combin0 * combin1 * *local_z - f0 * combin1 - f1 * combin0);
@@ -695,7 +714,7 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             );
         } else {
             let combin0 = challenges.combine(&evals[0]);
-            let f0 = filter[0].eval_filter(local_values, next_values);
+            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
             consumer.constraint_last_row(combin0 * *local_z - f0);
             consumer.constraint_transition(combin0 * (*local_z - *next_z) - f0);
         }
@@ -841,12 +860,16 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
 >(
     builder: &mut CircuitBuilder<F, D>,
     vars: &S::EvaluationFrameTarget,
+    p2_vars: Option<&S::P2EvaluationFrameTarget>,
     ctl_vars: &[CtlCheckVarsTarget<F, D>],
     consumer: &mut RecursiveConstraintConsumer<F, D>,
     constraint_degree: usize,
 ) {
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
+
+    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
+    let p2_next_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_next_values());
 
     for lookup_vars in ctl_vars {
         let CtlCheckVarsTarget {
@@ -863,7 +886,7 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             .iter()
             .map(|col| {
                 col.iter()
-                    .map(|c| c.eval_with_next_circuit(builder, local_values, next_values))
+                    .map(|c| c.eval_with_next_circuit(builder, local_values, next_values, p2_local_values, p2_next_values))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -875,6 +898,8 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             &evals,
             local_values,
             next_values,
+            p2_local_values,
+            p2_next_values,
             helper_columns,
             constraint_degree,
             challenges,
@@ -896,8 +921,8 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             let combin0 = challenges.combine_circuit(builder, &evals[0]);
             let combin1 = challenges.combine_circuit(builder, &evals[1]);
 
-            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values);
-            let f1 = filter[1].eval_filter_circuit(builder, local_values, next_values);
+            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
+            let f1 = filter[1].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
 
             let combined = builder.mul_sub_extension(combin1, *local_z, f1);
             let combined = builder.mul_extension(combined, combin0);
@@ -910,7 +935,7 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             consumer.constraint_last_row(builder, constr);
         } else {
             let combin0 = challenges.combine_circuit(builder, &evals[0]);
-            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values);
+            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
 
             let constr = builder.mul_sub_extension(combin0, *local_z, f0);
             consumer.constraint_last_row(builder, constr);
@@ -1041,16 +1066,18 @@ pub mod debug_utils {
     /// The key of `extra_looking_values` is the corresponding CTL's position within `cross_table_lookups`.
     pub fn check_ctls<F: Field>(
         trace_poly_values: &[Vec<PolynomialValues<F>>],
+        p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>]>,
         cross_table_lookups: &[CrossTableLookup<F>],
         extra_looking_values: &HashMap<usize, Vec<Vec<F>>>,
     ) {
         for (i, ctl) in cross_table_lookups.iter().enumerate() {
-            check_ctl(trace_poly_values, ctl, i, extra_looking_values.get(&i));
+            check_ctl(trace_poly_values, p2_trace_poly_values, ctl, i, extra_looking_values.get(&i));
         }
     }
 
     fn check_ctl<F: Field>(
         trace_poly_values: &[Vec<PolynomialValues<F>>],
+        p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>]>,
         ctl: &CrossTableLookup<F>,
         ctl_index: usize,
         extra_looking_values: Option<&Vec<Vec<F>>>,
@@ -1066,9 +1093,9 @@ pub mod debug_utils {
         let mut looked_multiset = MultiSet::<F>::new();
 
         for table in looking_tables {
-            process_table(trace_poly_values, table, &mut looking_multiset);
+            process_table(trace_poly_values, p2_trace_poly_values, table, &mut looking_multiset);
         }
-        process_table(trace_poly_values, looked_table, &mut looked_multiset);
+        process_table(trace_poly_values, p2_trace_poly_values, looked_table, &mut looked_multiset);
 
         // Include extra looking values if any for this `ctl_index`.
         if let Some(values) = extra_looking_values {
@@ -1097,17 +1124,19 @@ pub mod debug_utils {
 
     fn process_table<F: Field>(
         trace_poly_values: &[Vec<PolynomialValues<F>>],
+        p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>]>,
         table: &TableWithColumns<F>,
         multiset: &mut MultiSet<F>,
     ) {
         let trace = &trace_poly_values[table.table];
+        let p2_trace = p2_trace_poly_values.is_some().then(|| p2_trace_poly_values.unwrap()[table.table].as_ref());
         for i in 0..trace[0].len() {
-            let filter = table.filter.eval_table(trace, i);
+            let filter = table.filter.eval_table(trace,p2_trace, i);
             if filter.is_one() {
                 let row = table
                     .columns
                     .iter()
-                    .map(|c| c.eval_table(trace, i))
+                    .map(|c| c.eval_table(trace, p2_trace, i))
                     .collect::<Vec<_>>();
                 multiset.entry(row).or_default().push((table.table, i));
             } else {

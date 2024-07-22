@@ -88,7 +88,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
-        p2_vars: Option<Self::P2EvaluationFrame<FE, P, D2>>,
+        p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
         random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
@@ -102,7 +102,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
         &self,
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
-        p2_vars: Option<Self::P2EvaluationFrameTarget>,
+        p2_vars: Option<&Self::P2EvaluationFrameTarget>,
         random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {

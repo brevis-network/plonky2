@@ -113,13 +113,15 @@ pub fn verify_stark_proof_with_challenges_circuit<
             .collect::<Vec<_>>(),
     );
 
-    let p2_vars =  (!p2_local_values.is_none() && !p2_next_values.is_none()).then(|| {
+    let mut p2_vars: Option<S::P2EvaluationFrameTarget> = None;
+    p2_vars =  (!p2_local_values.is_none() && !p2_next_values.is_none()).then(|| {
             S::P2EvaluationFrameTarget::from_values(
             p2_local_values.as_ref().unwrap(),
             p2_next_values.as_ref().unwrap(),
             &[],
             )
     });
+    let p2_vars = p2_vars.as_ref();
 
     let degree_bits = proof.recover_degree_bits(inner_config);
     let zeta_pow_deg = builder.exp_power_of_2_extension(challenges.stark_zeta, degree_bits);
