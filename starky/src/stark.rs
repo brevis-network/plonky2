@@ -17,7 +17,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use crate::config::StarkConfig;
 use crate::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
 use crate::evaluation_frame::{StarkEvaluationFrame};
-use crate::lookup::Lookup;
+use crate::lookup::{Column, Filter, Lookup};
 
 
 /// Represents a STARK system.
@@ -268,6 +268,17 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     fn lookups(&self) -> Vec<Lookup<F>> {
         vec![]
     }
+
+    /// Outputs all Cross LookUp Columns this table needs to perform
+    fn ctl_columns(&self) -> Vec<Column<F>> {
+        vec![]
+    }
+
+    /// CTL filter for the final block rows of the table.
+    fn clt_filter(&self) -> Filter<F> {
+        Filter::default()
+    }
+
 
     /// Outputs the number of total lookup helper columns, based on this STARK's vector
     /// of [`Lookup`] and the number of challenges used by this [`StarkConfig`].

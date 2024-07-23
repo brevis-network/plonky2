@@ -724,12 +724,14 @@ fn check_constraints<'a, F, C, S, const D: usize>(
 
     // Assert that all constraints evaluate to 0 over our subgroup.
     for (row, v) in constraint_values.iter().enumerate() {
-        for x in v.iter() {
+        println!("constraits {}", v.iter().len());
+        for (c, x) in v.iter().enumerate() {
             assert!(
                 x.is_zero(),
-                "Constraint failed in {} at row {}",
+                "Constraint failed in {} at row {}, position {}",
                 type_name::<S>(),
-                row
+                row,
+                c,
             )
         }
     }

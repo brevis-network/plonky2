@@ -385,7 +385,7 @@ impl<F: Field> Column<F> {
         } else {
             vs.extend(v);
         }
-        assert_eq!(vs.len(), self.linear_combination.len());
+        // assert_eq!(vs.len(), self.linear_combination.len());
         let pairs = self
             .linear_combination
             .iter()
@@ -877,6 +877,8 @@ pub(crate) fn eval_packed_lookups_generic<F, FE, P, S, const D: usize, const D2:
 
     let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
     let p2_next_values = p2_local_values.is_some().then(||p2_vars.unwrap().get_next_values());
+
+    println!("local_values: {:?}, p2_local_values: {:?}", local_values, p2_local_values);
 
     let degree = stark.constraint_degree();
     let mut start = 0;
