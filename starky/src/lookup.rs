@@ -361,9 +361,6 @@ impl<F: Field> Column<F> {
     /// Evaluates the column on all rows.
     pub(crate) fn eval_all_rows(&self, table: &[PolynomialValues<F>], p2_table: Option<&[PolynomialValues<F>]>) -> Vec<F> {
         let length = table[0].len();
-        if let Some(p2_table) = p2_table {
-            assert_eq!(p2_table[0].len(), length)
-        }
         (0..length)
             .map(|row| self.eval_table(table, p2_table, row))
             .collect::<Vec<F>>()
@@ -633,9 +630,6 @@ pub(crate) fn lookup_helper_columns<F: Field>(
 ) -> Vec<PolynomialValues<F>> {
     assert_eq!(lookup.columns.len(), lookup.filter_columns.len());
 
-    if let Some(p2_trace_poly_values) = p2_trace_poly_values {
-        assert_eq!(trace_poly_values[0].values.len(), p2_trace_poly_values[0].values.len())
-    }
     let num_total_logup_entries = trace_poly_values[0].values.len() * lookup.columns.len();
     assert!(BigUint::from(num_total_logup_entries) < F::characteristic());
 
@@ -877,8 +871,6 @@ pub(crate) fn eval_packed_lookups_generic<F, FE, P, S, const D: usize, const D2:
 
     let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
     let p2_next_values = p2_local_values.is_some().then(||p2_vars.unwrap().get_next_values());
-
-    println!("local_values: {:?}, p2_local_values: {:?}", local_values, p2_local_values);
 
     let degree = stark.constraint_degree();
     let mut start = 0;

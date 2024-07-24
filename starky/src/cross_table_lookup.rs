@@ -83,7 +83,7 @@ impl<F: Field> TableWithColumns<F> {
 }
 
 /// Cross-table lookup data consisting in the lookup table (`looked_table`) and all the tables that look into `looked_table` (`looking_tables`).
-/// Each `looking_table` corresponds to a STARK's table whose rows have been filtered out and whose columns have been through a linear combination (see `eval_table`). The concatenation of those smaller tables should result in the `looked_table`.
+/// Each `looking_table` corresponds to a STARK's table whoseaa rows have been filtered out and whose columns have been through a linear combination (see `eval_table`). The concatenation of those smaller tables should result in the `looked_table`.
 #[derive(Clone, Debug)]
 pub struct CrossTableLookup<F: Field> {
     /// Column linear combinations for all tables that are looking into the current table.

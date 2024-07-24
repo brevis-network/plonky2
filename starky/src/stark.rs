@@ -275,7 +275,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     }
 
     /// CTL filter for the final block rows of the table.
-    fn clt_filter(&self) -> Filter<F> {
+    fn ctl_filter(&self) -> Filter<F> {
         Filter::default()
     }
 

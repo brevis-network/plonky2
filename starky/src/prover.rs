@@ -724,7 +724,6 @@ fn check_constraints<'a, F, C, S, const D: usize>(
 
     // Assert that all constraints evaluate to 0 over our subgroup.
     for (row, v) in constraint_values.iter().enumerate() {
-        println!("constraits {}", v.iter().len());
         for (c, x) in v.iter().enumerate() {
             assert!(
                 x.is_zero(),
