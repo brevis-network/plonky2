@@ -55,7 +55,7 @@ use crate::lookup::{
     eval_helper_columns, eval_helper_columns_circuit, get_grand_product_challenge_set,
     get_helper_cols, Column, ColumnFilter, Filter, GrandProductChallenge, GrandProductChallengeSet,
 };
-use crate::proof::{MultiProof, StarkProofTarget, StarkProofWithMetadata};
+use crate::proof::{MultiProof, StarkProofTarget, StarkProofWithMetadata, StarkProofWithPublicInputs};
 use crate::stark::Stark;
 
 /// An alias for `usize`, to represent the index of a STARK table in a multi-STARK setting.
@@ -253,29 +253,29 @@ where
 }
 
 /// Outputs all the CTL data necessary to prove a multi-STARK system.
-pub fn get_ctl_vars_from_proofs<'a, F, C, const D: usize, const N: usize>(
-    multi_proof: &MultiProof<F, C, D, N>,
-    all_cross_table_lookups: &'a [CrossTableLookup<F>],
-    ctl_challenges: &'a GrandProductChallengeSet<F>,
-    num_lookup_columns: &'a [usize; N],
-    max_constraint_degree: usize,
-) -> [Vec<CtlCheckVars<'a, F, <F as Extendable<D>>::Extension, <F as Extendable<D>>::Extension, D>>;
-       N]
-where
-    F: RichField + Extendable<D>,
-    C: GenericConfig<D, F = F>,
-{
-    let num_ctl_helper_cols =
-        num_ctl_helper_columns_by_table(all_cross_table_lookups, max_constraint_degree);
-
-    CtlCheckVars::from_proofs(
-        &multi_proof.stark_proofs,
-        all_cross_table_lookups,
-        ctl_challenges,
-        num_lookup_columns,
-        &num_ctl_helper_cols,
-    )
-}
+// pub fn get_ctl_vars_from_proofs<'a, F, C, const D: usize, const N: usize>(
+//     multi_proof: &MultiProof<F, C, D, N>,
+//     all_cross_table_lookups: &'a [CrossTableLookup<F>],
+//     ctl_challenges: &'a GrandProductChallengeSet<F>,
+//     num_lookup_columns: &'a [usize; N],
+//     max_constraint_degree: usize,
+// ) -> [Vec<CtlCheckVars<'a, F, <F as Extendable<D>>::Extension, <F as Extendable<D>>::Extension, D>>;
+//        N]
+// where
+//     F: RichField + Extendable<D>,
+//     C: GenericConfig<D, F = F>,
+// {
+//     let num_ctl_helper_cols =
+//         num_ctl_helper_columns_by_table(all_cross_table_lookups, max_constraint_degree);
+// 
+//     CtlCheckVars::from_proofs(
+//         &multi_proof.stark_proofs,
+//         all_cross_table_lookups,
+//         ctl_challenges,
+//         num_lookup_columns,
+//         &num_ctl_helper_cols,
+//     )
+// }
 /// Returns the number of helper columns for each `Table`.
 pub(crate) fn num_ctl_helper_columns_by_table<F: Field, const N: usize>(
     ctls: &[CrossTableLookup<F>],
@@ -507,7 +507,7 @@ impl<'a, F: RichField + Extendable<D>, const D: usize>
 {
     /// Extracts the `CtlCheckVars` for each STARK.
     pub fn from_proofs<C: GenericConfig<D, F = F>, const N: usize>(
-        proofs: &[StarkProofWithMetadata<F, C, D>; N],
+        proofs: &[StarkProofWithPublicInputs<F, C, D>; N],
         cross_table_lookups: &'a [CrossTableLookup<F>],
         ctl_challenges: &'a GrandProductChallengeSet<F>,
         num_lookup_columns: &[usize; N],

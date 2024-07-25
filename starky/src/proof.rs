@@ -332,11 +332,12 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
 
     /// Constructs the openings required by FRI.
     /// All openings but `ctl_zs_first` are grouped together.
-    pub(crate) fn to_fri_openings(&self) -> FriOpenings<F, D> {
+    pub fn to_fri_openings(&self) -> FriOpenings<F, D> {
         let zeta_batch = FriOpeningBatch {
             values: self
                 .local_values
                 .iter()
+                .chain(self.p2_local_values.iter().flatten())
                 .chain(self.auxiliary_polys.iter().flatten())
                 .chain(self.quotient_polys.iter().flatten())
                 .copied()
@@ -346,6 +347,7 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
             values: self
                 .next_values
                 .iter()
+                .chain(self.p2_next_values.iter().flatten())
                 .chain(self.auxiliary_polys_next.iter().flatten())
                 .copied()
                 .collect_vec(),
@@ -353,29 +355,6 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
 
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
-
-        if let Some(p2_local_values) = &self.p2_local_values {
-            let p2_zeta_batch = FriOpeningBatch {
-                values: p2_local_values
-                    .iter()
-                    .chain(self.auxiliary_polys.iter().flatten())
-                    .chain(self.quotient_polys.iter().flatten())
-                    .copied()
-                    .collect_vec(),
-            };
-            batches.push(p2_zeta_batch);
-        }
-
-        if let Some(p2_next_values) = &self.p2_next_values {
-            let p2_zeta_next_batch = FriOpeningBatch {
-                values: p2_next_values
-                    .iter()
-                    .chain(self.auxiliary_polys_next.iter().flatten())
-                    .copied()
-                    .collect_vec(),
-            };
-            batches.push(p2_zeta_next_batch);
-        }
 
         if let Some(ctl_zs_first) = self.ctl_zs_first.as_ref() {
             debug_assert!(!ctl_zs_first.is_empty());
@@ -502,6 +481,7 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
             values: self
                 .local_values
                 .iter()
+                .chain(self.p2_local_values.iter().flatten())
                 .chain(self.auxiliary_polys.iter().flatten())
                 .chain(self.quotient_polys.iter().flatten())
                 .copied()
@@ -511,35 +491,13 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
             values: self
                 .next_values
                 .iter()
+                .chain(self.p2_next_values.iter().flatten())
                 .chain(self.auxiliary_polys_next.iter().flatten())
                 .copied()
                 .collect_vec(),
         };
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
-
-        if let Some(p2_local_values) = &self.p2_local_values {
-            let p2_zeta_batch = FriOpeningBatchTarget {
-                values: p2_local_values
-                    .iter()
-                    .chain(self.auxiliary_polys.iter().flatten())
-                    .chain(self.quotient_polys.iter().flatten())
-                    .copied()
-                    .collect_vec(),
-            };
-            batches.push(p2_zeta_batch);
-        }
-
-        if let Some(p2_next_values) = &self.p2_next_values {
-            let p2_zeta_next_batch = FriOpeningBatchTarget {
-                values: p2_next_values
-                    .iter()
-                    .chain(self.auxiliary_polys_next.iter().flatten())
-                    .copied()
-                    .collect_vec(),
-            };
-            batches.push(p2_zeta_next_batch);
-        }
 
         if let Some(ctl_zs_first) = self.ctl_zs_first.as_ref() {
             debug_assert!(!ctl_zs_first.is_empty());

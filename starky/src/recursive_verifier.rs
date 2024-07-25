@@ -188,6 +188,7 @@ pub fn verify_stark_proof_with_challenges_circuit<
     }
 
     let merkle_caps = once(proof.trace_cap.clone())
+        .chain(proof.p2_trace_cap.clone())
         .chain(proof.auxiliary_polys_cap.clone())
         .chain(proof.quotient_polys_cap.clone())
         .collect_vec();
@@ -270,6 +271,7 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
     let cap_height = fri_params.config.cap_height;
 
     let num_leaves_per_oracle = once(S::COLUMNS)
+        .chain(once(S::P2_COLUMNS))
         .chain(
             (stark.uses_lookups() || stark.requires_ctls())
                 .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),

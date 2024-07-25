@@ -209,6 +209,7 @@ where
     }
 
     let alphas = challenger.get_n_challenges(config.num_challenges);
+    println!("prover alphas:{:?}", alphas);
 
     let num_ctl_polys = ctl_data
         .map(|data| data.num_ctl_helper_polys())
@@ -293,6 +294,7 @@ where
     };
 
     let zeta = challenger.get_extension_challenge::<D>();
+    println!("prover zeta: {:?}", zeta);
 
     // To avoid leaking witness data, we want to ensure that our opening locations, `zeta` and
     // `g * zeta`, are not in our subgroup `H`. It suffices to check `zeta` only, since
@@ -318,10 +320,13 @@ where
     // Get the FRI openings and observe them.
     challenger.observe_openings(&openings.to_fri_openings());
 
+
     let initial_merkle_trees = once(trace_commitment)
+        .chain(p2_trace_commitment)
         .chain(&auxiliary_polys_commitment)
         .chain(&quotient_commitment)
         .collect_vec();
+
 
     let opening_proof = timed!(
         timing,

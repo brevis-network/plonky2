@@ -191,6 +191,7 @@ where
     }
 
     let merkle_caps = once(proof.trace_cap.clone())
+        .chain(proof.p2_trace_cap.clone())
         .chain(proof.auxiliary_polys_cap.clone())
         .chain(proof.quotient_polys_cap.clone())
         .collect_vec();
@@ -203,6 +204,8 @@ where
         })
         .unwrap_or_default();
 
+    println!("verifier zeta: {:?}", challenges.stark_zeta);
+    println!("degree_bits:{:?}",degree_bits);
     verify_fri_proof::<F, C, D>(
         &stark.fri_instance(
             challenges.stark_zeta,
@@ -271,6 +274,12 @@ where
 
     ensure!(local_values.len() == S::COLUMNS);
     ensure!(next_values.len() == S::COLUMNS);
+
+    if let (Some(p2_local_values), Some(p2_next_values)) = (p2_local_values, p2_next_values) {
+        ensure!(p2_local_values.len() == S::P2_COLUMNS);
+        ensure!(p2_next_values.len() == S::P2_COLUMNS);
+    }
+
     ensure!(if let Some(quotient_polys) = quotient_polys {
         quotient_polys.len() == stark.num_quotient_polys(config)
     } else {
