@@ -204,8 +204,6 @@ where
         })
         .unwrap_or_default();
 
-    println!("verifier zeta: {:?}", challenges.stark_zeta);
-    println!("degree_bits:{:?}",degree_bits);
     verify_fri_proof::<F, C, D>(
         &stark.fri_instance(
             challenges.stark_zeta,

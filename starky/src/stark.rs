@@ -182,7 +182,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
 
         if self.requires_ctls() {
             let ctl_zs_info = FriPolynomialInfo::from_range(
-                1, // auxiliary oracle index
+                2, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helpers..num_auxiliary_polys,
             );
             let ctl_first_batch = FriBatchInfo {
@@ -265,7 +265,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
 
         if self.requires_ctls() {
             let ctl_zs_info = FriPolynomialInfo::from_range(
-                1, // auxiliary oracle index
+                2, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helper_polys..num_auxiliary_polys,
             );
             let ctl_first_batch = FriBatchInfoTarget {
