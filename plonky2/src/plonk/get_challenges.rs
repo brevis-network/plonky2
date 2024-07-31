@@ -35,6 +35,7 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
     circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
     common_data: &CommonCircuitData<F, D>,
     without_public_input_hash: bool,
+    public_inputs: &Vec<F>,
 ) -> anyhow::Result<ProofChallenges<F, D>> {
     let config = &common_data.config;
     let num_challenges = config.num_challenges;
@@ -46,6 +47,8 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
     challenger.observe_hash::<C::Hasher>(*circuit_digest);
     if !without_public_input_hash {
         challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    } else {
+        challenger.observe_elements(public_inputs);
     }
 
     challenger.observe_cap::<C::Hasher>(wires_cap);
@@ -138,7 +141,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             *pow_witness,
             circuit_digest,
             common_data,
-            false
+            false,
+            &self.public_inputs,
         )
     }
 
@@ -174,6 +178,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             circuit_digest,
             common_data,
             true,
+            &self.public_inputs,
         )
     }
 }
@@ -214,6 +219,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             circuit_digest,
             common_data,
             false,
+            &self.public_inputs,
         )
     }
 

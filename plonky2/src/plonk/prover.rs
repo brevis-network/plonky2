@@ -209,6 +209,8 @@ where
     challenger.observe_hash::<C::Hasher>(prover_data.circuit_digest);
     if !without_public_inputs_hash {
         challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    } else {
+        challenger.observe_elements(&public_inputs)
     }
 
     challenger.observe_cap::<C::Hasher>(&wires_commitment.merkle_tree.cap);

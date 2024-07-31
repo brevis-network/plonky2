@@ -332,7 +332,9 @@ mod tests {
         let pt = builder.add_virtual_proof_with_pis(&inner_cd);
         pw.set_proof_with_pis_target(&pt, &inner_proof);
 
-        builder.register_public_input(pt.public_inputs[0]);
+        for n in 1..=1000 {
+            builder.register_public_input(pt.public_inputs[0]);
+        }
 
         let inner_data = builder.add_virtual_verifier_data(inner_cd.config.fri_config.cap_height);
         pw.set_cap_target(
