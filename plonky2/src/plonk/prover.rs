@@ -125,7 +125,26 @@ where
         generate_partial_witness(inputs, prover_data, common_data)
     );
 
-    prove_with_partition_witness(prover_data, common_data, partition_witness, timing)
+    prove_with_partition_witness(prover_data, common_data, partition_witness, timing, false)
+}
+
+pub fn prove_without_hash<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    prover_data: &ProverOnlyCircuitData<F, C, D>,
+    common_data: &CommonCircuitData<F, D>,
+    inputs: PartialWitness<F>,
+    timing: &mut TimingTree,
+) -> Result<ProofWithPublicInputs<F, C, D>>
+where
+    C::Hasher: Hasher<F>,
+    C::InnerHasher: Hasher<F>,
+{
+    let partition_witness = timed!(
+        timing,
+        &format!("run {} generators", prover_data.generators.len()),
+        generate_partial_witness(inputs, prover_data, common_data)
+    );
+
+    prove_with_partition_witness(prover_data, common_data, partition_witness, timing, true)
 }
 
 pub fn prove_with_partition_witness<
@@ -137,6 +156,7 @@ pub fn prove_with_partition_witness<
     common_data: &CommonCircuitData<F, D>,
     mut partition_witness: PartitionWitness<F>,
     timing: &mut TimingTree,
+    without_public_inputs_hash: bool,
 ) -> Result<ProofWithPublicInputs<F, C, D>>
 where
     C::Hasher: Hasher<F>,
@@ -151,6 +171,7 @@ where
     set_lookup_wires(prover_data, common_data, &mut partition_witness);
 
     let public_inputs = partition_witness.get_targets(&prover_data.public_inputs);
+
     let public_inputs_hash = C::InnerHasher::hash_no_pad(&public_inputs);
 
     let witness = timed!(
@@ -186,7 +207,9 @@ where
 
     // Observe the instance.
     challenger.observe_hash::<C::Hasher>(prover_data.circuit_digest);
-    challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    if !without_public_inputs_hash {
+        challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    }
 
     challenger.observe_cap::<C::Hasher>(&wires_commitment.merkle_tree.cap);
 

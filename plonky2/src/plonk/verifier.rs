@@ -37,6 +37,29 @@ pub(crate) fn verify<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, c
     )
 }
 
+pub(crate) fn verify_without_hash<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    proof_with_pis: ProofWithPublicInputs<F, C, D>,
+    verifier_data: &VerifierOnlyCircuitData<C, D>,
+    common_data: &CommonCircuitData<F, D>,
+) -> Result<()> {
+    validate_proof_with_pis_shape(&proof_with_pis, common_data)?;
+
+    let public_inputs_hash = proof_with_pis.get_public_inputs_hash();
+    let challenges = proof_with_pis.get_challenges_without_hash(
+        public_inputs_hash,
+        &verifier_data.circuit_digest,
+        common_data,
+    )?;
+
+    verify_with_challenges::<F, C, D>(
+        proof_with_pis.proof,
+        public_inputs_hash,
+        challenges,
+        verifier_data,
+        common_data,
+    )
+}
+
 pub(crate) fn verify_with_challenges<
     F: RichField + Extendable<D>,
     C: GenericConfig<D, F = F>,

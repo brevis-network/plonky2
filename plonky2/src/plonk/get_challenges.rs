@@ -34,6 +34,7 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
     pow_witness: F,
     circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
     common_data: &CommonCircuitData<F, D>,
+    without_public_input_hash: bool,
 ) -> anyhow::Result<ProofChallenges<F, D>> {
     let config = &common_data.config;
     let num_challenges = config.num_challenges;
@@ -43,7 +44,9 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
 
     // Observe the instance.
     challenger.observe_hash::<C::Hasher>(*circuit_digest);
-    challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    if !without_public_input_hash {
+        challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    }
 
     challenger.observe_cap::<C::Hasher>(wires_cap);
     let plonk_betas = challenger.get_n_challenges(num_challenges);
@@ -135,6 +138,42 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             *pow_witness,
             circuit_digest,
             common_data,
+            false
+        )
+    }
+
+    pub fn get_challenges_without_hash(
+        &self,
+        public_inputs_hash: <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash,
+        circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
+        common_data: &CommonCircuitData<F, D>,
+    ) -> anyhow::Result<ProofChallenges<F, D>> {
+        let Proof {
+            wires_cap,
+            plonk_zs_partial_products_cap,
+            quotient_polys_cap,
+            openings,
+            opening_proof:
+            FriProof {
+                commit_phase_merkle_caps,
+                final_poly,
+                pow_witness,
+                ..
+            },
+        } = &self.proof;
+
+        get_challenges::<F, C, D>(
+            public_inputs_hash,
+            wires_cap,
+            plonk_zs_partial_products_cap,
+            quotient_polys_cap,
+            openings,
+            commit_phase_merkle_caps,
+            final_poly,
+            *pow_witness,
+            circuit_digest,
+            common_data,
+            true,
         )
     }
 }
@@ -174,6 +213,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             *pow_witness,
             circuit_digest,
             common_data,
+            false,
         )
     }
 

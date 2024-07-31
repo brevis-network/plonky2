@@ -291,6 +291,8 @@ mod tests {
             add_virtual_stark_proof_with_pis(&mut builder, &stark, inner_config, degree_bits, 0, 0);
         set_stark_proof_with_pis_target(&mut pw, &pt, &inner_proof, builder.zero());
 
+        builder.register_public_input(pt.public_inputs[2]);
+
         verify_stark_proof_circuit::<F, InnerC, S, D>(&mut builder, stark, pt, inner_config);
 
         let data = builder.build::<C>();
@@ -299,6 +301,7 @@ mod tests {
         println!("plonky2 recursive use {}s", start_recursive.elapsed().as_secs_f64());
 
         let res_proof = proof.clone();
+        println!("recursive public input count: {}", res_proof.public_inputs.len());
         data.verify(proof)?;
         println!("recursive plonky2 degree: {}", data.common.degree_bits());
         Ok((res_proof, data.verifier_only, data.common))
@@ -329,6 +332,8 @@ mod tests {
         let pt = builder.add_virtual_proof_with_pis(&inner_cd);
         pw.set_proof_with_pis_target(&pt, &inner_proof);
 
+        builder.register_public_input(pt.public_inputs[0]);
+
         let inner_data = builder.add_virtual_verifier_data(inner_cd.config.fri_config.cap_height);
         pw.set_cap_target(
             &inner_data.constants_sigmas_cap,
@@ -343,12 +348,12 @@ mod tests {
         let mut timing = TimingTree::new("prove", Level::Debug);
 
         let start_recursive = Instant::now();
-        let proof = plonky2::plonk::prover::prove(&data.prover_only, &data.common, pw, &mut timing)?;
+        let proof = plonky2::plonk::prover::prove_without_hash(&data.prover_only, &data.common, pw, &mut timing)?;
         println!("plonky2 wrapper use: {}s", start_recursive.elapsed().as_secs_f64());
-
+        println!("wrapper proof public inputs count: {}", proof.public_inputs.len());
         println!("plonky2 wrapper degrees: {}", data.common.degree_bits());
 
-        data.verify(proof.clone())?;
+        data.verify_without_hash(proof.clone())?;
 
         Ok((proof, data.verifier_only, data.common))
     }
