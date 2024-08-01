@@ -61,7 +61,7 @@ pub fn verify_stark_proof_circuit<
         &stark,
         &proof_with_pis.proof,
         &proof_with_pis.public_inputs,
-        challenges,
+        &challenges,
         None,
         inner_config,
     );
@@ -78,13 +78,13 @@ pub fn verify_stark_proof_with_challenges_circuit<
     stark: &S,
     proof: &StarkProofTarget<D>,
     public_inputs: &[Target],
-    challenges: StarkProofChallengesTarget<D>,
+    challenges: &StarkProofChallengesTarget<D>,
     ctl_vars: Option<&[CtlCheckVarsTarget<F, D>]>,
     inner_config: &StarkConfig,
 ) where
     C::Hasher: AlgebraicHasher<F>,
 {
-    check_lookup_options(stark, proof, &challenges).unwrap();
+    check_lookup_options(stark, &proof, challenges).unwrap();
 
     let zero = builder.zero();
     let one = builder.one_extension();
@@ -134,7 +134,7 @@ pub fn verify_stark_proof_with_challenges_circuit<
 
     let mut consumer = RecursiveConstraintConsumer::<F, D>::new(
         builder.zero_extension(),
-        challenges.stark_alphas,
+        challenges.stark_alphas.clone(),
         z_last,
         l_0,
         l_last,
