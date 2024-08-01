@@ -476,7 +476,7 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
     }
 
     /// Circuit version of `to_fri_openings`for [`FriOpeningsTarget`].
-    pub(crate) fn to_fri_openings(&self, zero: Target) -> FriOpeningsTarget<D> {
+    pub fn to_fri_openings(&self, zero: Target) -> FriOpeningsTarget<D> {
         let zeta_batch = FriOpeningBatchTarget {
             values: self
                 .local_values
