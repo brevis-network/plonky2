@@ -130,12 +130,16 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             blinding: false,
         });
 
-        let p2_trace_info = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-        oracles.push(FriOracleInfo {
-            num_polys: Self::P2_COLUMNS,
-            blinding: false,
-        });
-
+        let p2_trace_info = if self.use_phase2() {
+            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            p2_trace_polys
+        } else {
+            vec![]
+        };
 
         let num_lookup_columns = self.num_lookup_helper_columns(config);
         let num_auxiliary_polys = num_lookup_columns + num_ctl_helpers + num_ctl_zs.len();
@@ -213,12 +217,16 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             blinding: false,
         });
 
-        let p2_trace_info = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-        oracles.push(FriOracleInfo {
-            num_polys: Self::P2_COLUMNS,
-            blinding: false,
-        });
-
+        let p2_trace_info  = if self.use_phase2() {
+            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            p2_trace_polys
+        } else {
+            vec![]
+        };
         let num_lookup_columns = self.num_lookup_helper_columns(config);
         let num_auxiliary_polys = num_lookup_columns + num_ctl_helper_polys + num_ctl_zs;
         let auxiliary_polys_info = if self.uses_lookups() || self.requires_ctls() {
