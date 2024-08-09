@@ -1,10 +1,11 @@
-use plonky2::field::extension::Extendable;
+use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::polynomial::PolynomialCoeffs;
 use plonky2::fri::proof::{FriProof, FriProofTarget};
 use plonky2::gadgets::polynomial::PolynomialCoeffsExtTarget;
 use plonky2::hash::hash_types::{MerkleCapTarget, RichField};
 use plonky2::hash::merkle_tree::MerkleCap;
 use plonky2::iop::challenger::{Challenger, RecursiveChallenger};
+use plonky2::iop::ext_target::ExtensionTarget;
 use plonky2::iop::target::Target;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig};
@@ -27,6 +28,7 @@ fn get_challenges<F, C, const D: usize>(
     challenger: &mut Challenger<F, C::Hasher>,
     challenges: Option<&GrandProductChallengeSet<F>>,
     trace_cap: Option<&MerkleCap<F, C::Hasher>>,
+    p2_trace_cap: Option<&MerkleCap<F, C::Hasher>>,
     auxiliary_polys_cap: Option<&MerkleCap<F, C::Hasher>>,
     quotient_polys_cap: Option<&MerkleCap<F, C::Hasher>>,
     openings: &StarkOpeningSet<F, D>,
@@ -44,6 +46,14 @@ where
 
     if let Some(cap) = &trace_cap {
         challenger.observe_cap(cap);
+    }
+
+    let mut random_gamma = None;
+    if let Some(p2_trace_cap) = &p2_trace_cap {
+        let random_f = challenger.get_challenge();
+        let random_ext = F::Extension::from_basefield(random_f);
+        random_gamma = Some(random_ext);
+        challenger.observe_cap(p2_trace_cap);
     }
 
     let lookup_challenge_set = if let Some(&challenges) = challenges.as_ref() {
@@ -68,6 +78,7 @@ where
     challenger.observe_openings(&openings.to_fri_openings());
 
     StarkProofChallenges {
+        random_gamma,
         lookup_challenge_set,
         stark_alphas,
         stark_zeta,
@@ -104,6 +115,7 @@ where
 
         let StarkProof {
             trace_cap,
+            p2_trace_cap,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -122,10 +134,17 @@ where
             Some(trace_cap)
         };
 
+        let p2_trace_cap_ref = if ignore_trace_cap || p2_trace_cap.is_none() {
+            None
+        } else {
+            Some(p2_trace_cap.as_ref().unwrap())
+        };
+
         get_challenges::<F, C, D>(
             challenger,
             challenges,
             trace_cap,
+            p2_trace_cap_ref,
             auxiliary_polys_cap.as_ref(),
             quotient_polys_cap.as_ref(),
             openings,
@@ -170,6 +189,7 @@ fn get_challenges_target<F, C, const D: usize>(
     challenger: &mut RecursiveChallenger<F, C::Hasher, D>,
     challenges: Option<&GrandProductChallengeSet<Target>>,
     trace_cap: Option<&MerkleCapTarget>,
+    p2_trace_cap: Option<&MerkleCapTarget>,
     auxiliary_polys_cap: Option<&MerkleCapTarget>,
     quotient_polys_cap: Option<&MerkleCapTarget>,
     openings: &StarkOpeningSetTarget<D>,
@@ -189,6 +209,14 @@ where
         challenger.observe_cap(trace_cap);
     }
 
+    let mut random_gamma = None;
+    if let Some(p2_trace_cap) = &p2_trace_cap {
+        let random_f = challenger.get_challenge(builder);
+        let random_ext = random_f.to_ext_target(builder.zero());
+        random_gamma = Some(random_ext);
+        challenger.observe_cap(p2_trace_cap);
+    }
+
     let lookup_challenge_set = if let Some(&challenges) = challenges.as_ref() {
         Some(challenges.clone())
     } else {
@@ -200,7 +228,6 @@ where
     if let Some(cap) = auxiliary_polys_cap {
         challenger.observe_cap(cap);
     }
-
     let stark_alphas = challenger.get_n_challenges(builder, num_challenges);
 
     if let Some(cap) = quotient_polys_cap {
@@ -212,6 +239,7 @@ where
     challenger.observe_openings(&openings.to_fri_openings(builder.zero()));
 
     StarkProofChallengesTarget {
+        random_gamma,
         lookup_challenge_set,
         stark_alphas,
         stark_zeta,
@@ -248,6 +276,7 @@ impl<const D: usize> StarkProofTarget<D> {
     {
         let StarkProofTarget {
             trace_cap,
+            p2_trace_cap,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -266,11 +295,18 @@ impl<const D: usize> StarkProofTarget<D> {
             Some(trace_cap)
         };
 
+        let p2_trace_cap_ref = if ignore_trace_cap || p2_trace_cap.is_none() {
+            None
+        } else {
+            Some(p2_trace_cap.as_ref().unwrap())
+        };
+
         get_challenges_target::<F, C, D>(
             builder,
             challenger,
             challenges,
             trace_cap,
+            p2_trace_cap_ref,
             auxiliary_polys_cap.as_ref(),
             quotient_polys_cap.as_ref(),
             openings,

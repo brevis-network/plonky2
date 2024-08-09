@@ -131,7 +131,7 @@ pub fn test_stark_circuit_constraints<
         lagrange_first_t,
         lagrange_last_t,
     );
-    stark.eval_ext_circuit(&mut builder, &vars, &mut consumer);
+    stark.eval_ext_circuit(&mut builder, &vars,None,None, &mut consumer);
     let circuit_eval = consumer.accumulators()[0];
     let native_eval_t = builder.constant_extension(native_eval);
     builder.connect_extension(circuit_eval, native_eval_t);

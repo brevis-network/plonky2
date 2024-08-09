@@ -53,6 +53,14 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Unconstrained
     type EvaluationFrameTarget =
         StarkFrame<ExtensionTarget<D>, ExtensionTarget<D>, COLUMNS, PUBLIC_INPUTS>;
 
+    type P2EvaluationFrame<FE, P, const D2: usize> where FE: FieldExtension<D2, BaseField=F>, P: PackedField<Scalar=FE> = StarkFrame<P, P::Scalar, 0, 0>;
+    type P2EvaluationFrameTarget = StarkFrame<
+        ExtensionTarget<D>,
+        ExtensionTarget<D>,
+        0,
+        0,
+    >;
+
     fn constraint_degree(&self) -> usize {
         0
     }
@@ -60,8 +68,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Unconstrained
     // We don't constrain any register.
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
-        _vars: &Self::EvaluationFrame<FE, P, D2>,
-        _yield_constr: &mut ConstraintConsumer<P>,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
+        yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>,
@@ -71,9 +81,11 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for Unconstrained
     // We don't constrain any register.
     fn eval_ext_circuit(
         &self,
-        _builder: &mut CircuitBuilder<F, D>,
-        _vars: &Self::EvaluationFrameTarget,
-        _yield_constr: &mut RecursiveConstraintConsumer<F, D>,
+        builder: &mut CircuitBuilder<F, D>,
+        vars: &Self::EvaluationFrameTarget,
+        p2_vars: Option<&Self::P2EvaluationFrameTarget>,
+        random_gamma: Option<ExtensionTarget<D>>,
+        yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
     }
 }

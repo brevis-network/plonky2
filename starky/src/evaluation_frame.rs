@@ -43,7 +43,7 @@ pub struct StarkFrame<
 }
 
 impl<T: Copy + Clone + Default, U: Copy + Clone + Default, const N: usize, const N2: usize>
-    StarkEvaluationFrame<T, U> for StarkFrame<T, U, N, N2>
+        StarkEvaluationFrame<T, U> for StarkFrame<T, U, N, N2>
 {
     const COLUMNS: usize = N;
     const PUBLIC_INPUTS: usize = N2;
