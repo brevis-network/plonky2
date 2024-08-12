@@ -61,7 +61,7 @@ pub fn verify_stark_proof_circuit<
         &stark,
         &proof_with_pis.proof,
         &proof_with_pis.public_inputs,
-        challenges,
+        &challenges,
         None,
         inner_config,
     );
@@ -78,13 +78,13 @@ pub fn verify_stark_proof_with_challenges_circuit<
     stark: &S,
     proof: &StarkProofTarget<D>,
     public_inputs: &[Target],
-    challenges: StarkProofChallengesTarget<D>,
+    challenges: &StarkProofChallengesTarget<D>,
     ctl_vars: Option<&[CtlCheckVarsTarget<F, D>]>,
     inner_config: &StarkConfig,
 ) where
     C::Hasher: AlgebraicHasher<F>,
 {
-    check_lookup_options(stark, proof, &challenges).unwrap();
+    check_lookup_options(stark, &proof, challenges).unwrap();
 
     let zero = builder.zero();
     let one = builder.one_extension();
@@ -96,6 +96,8 @@ pub fn verify_stark_proof_with_challenges_circuit<
     let StarkOpeningSetTarget {
         local_values,
         next_values,
+        p2_local_values,
+        p2_next_values,
         auxiliary_polys,
         auxiliary_polys_next,
         ctl_zs_first,
@@ -111,6 +113,16 @@ pub fn verify_stark_proof_with_challenges_circuit<
             .collect::<Vec<_>>(),
     );
 
+    let mut p2_vars: Option<S::P2EvaluationFrameTarget> = None;
+    p2_vars =  (!p2_local_values.is_none() && !p2_next_values.is_none()).then(|| {
+            S::P2EvaluationFrameTarget::from_values(
+            p2_local_values.as_ref().unwrap(),
+            p2_next_values.as_ref().unwrap(),
+            &[],
+            )
+    });
+    let p2_vars = p2_vars.as_ref();
+
     let degree_bits = proof.recover_degree_bits(inner_config);
     let zeta_pow_deg = builder.exp_power_of_2_extension(challenges.stark_zeta, degree_bits);
     let z_h_zeta = builder.sub_extension(zeta_pow_deg, one);
@@ -122,7 +134,7 @@ pub fn verify_stark_proof_with_challenges_circuit<
 
     let mut consumer = RecursiveConstraintConsumer::<F, D>::new(
         builder.zero_extension(),
-        challenges.stark_alphas,
+        challenges.stark_alphas.clone(),
         z_last,
         l_0,
         l_last,
@@ -153,6 +165,8 @@ pub fn verify_stark_proof_with_challenges_circuit<
             builder,
             stark,
             &vars,
+            p2_vars,
+            challenges.random_gamma.clone(),
             lookup_vars,
             ctl_vars,
             &mut consumer
@@ -174,6 +188,7 @@ pub fn verify_stark_proof_with_challenges_circuit<
     }
 
     let merkle_caps = once(proof.trace_cap.clone())
+        .chain(proof.p2_trace_cap.clone())
         .chain(proof.auxiliary_polys_cap.clone())
         .chain(proof.quotient_polys_cap.clone())
         .collect_vec();
@@ -257,6 +272,9 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 
     let num_leaves_per_oracle = once(S::COLUMNS)
         .chain(
+            stark.use_phase2().then(||S::P2_COLUMNS),
+        )
+        .chain(
             (stark.uses_lookups() || stark.requires_ctls())
                 .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
         )
@@ -266,6 +284,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
         )
         .collect_vec();
 
+    let p2_trace_cap = stark.use_phase2().then(|| builder.add_virtual_cap(cap_height));
+
     let auxiliary_polys_cap = (stark.uses_lookups() || stark.requires_ctls())
         .then(|| builder.add_virtual_cap(cap_height));
 
@@ -274,6 +294,7 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 
     StarkProofTarget {
         trace_cap: builder.add_virtual_cap(cap_height),
+        p2_trace_cap,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings: add_virtual_stark_opening_set::<F, S, D>(
@@ -297,6 +318,12 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
     StarkOpeningSetTarget {
         local_values: builder.add_virtual_extension_targets(S::COLUMNS),
         next_values: builder.add_virtual_extension_targets(S::COLUMNS),
+        p2_local_values: (stark
+            .use_phase2()
+            .then(|| builder.add_virtual_extension_targets(S::P2_COLUMNS))),
+        p2_next_values: (stark
+            .use_phase2()
+            .then(|| builder.add_virtual_extension_targets(S::P2_COLUMNS))),
         auxiliary_polys: (stark.uses_lookups() || stark.requires_ctls()).then(|| {
             builder.add_virtual_extension_targets(
                 stark.num_lookup_helper_columns(config) + num_ctl_helper_zs,
@@ -360,6 +387,9 @@ pub fn set_stark_proof_target<F, C: GenericConfig<D, F = F>, W, const D: usize>(
     W: WitnessWrite<F>,
 {
     witness.set_cap_target(&proof_target.trace_cap, &proof.trace_cap);
+    if let (Some(p2_target_trace_cap), Some(p2_trace_cap)) = (&proof_target.p2_trace_cap, &proof.p2_trace_cap) {
+        witness.set_cap_target(p2_target_trace_cap, p2_trace_cap);
+    }
     if let (Some(quotient_polys_cap_target), Some(quotient_polys_cap)) =
         (&proof_target.quotient_polys_cap, &proof.quotient_polys_cap)
     {

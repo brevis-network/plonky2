@@ -21,15 +21,18 @@ use plonky2::iop::target::Target;
 use plonky2::plonk::config::{GenericConfig, Hasher};
 use plonky2::util::serialization::{Buffer, IoResult, Read, Write};
 use plonky2_maybe_rayon::*;
+use serde::{Deserialize, Serialize};
 
 use crate::config::StarkConfig;
 use crate::lookup::GrandProductChallengeSet;
 
 /// Merkle caps and openings that form the proof of a single STARK.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StarkProof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize> {
     /// Merkle cap of LDEs of trace values.
     pub trace_cap: MerkleCap<F, C::Hasher>,
+    /// Merkle cap of LDEs of phase 2 trace values.
+    pub p2_trace_cap: Option<MerkleCap<F, C::Hasher>>,
     /// Optional merkle cap of LDEs of permutation Z values, if any.
     pub auxiliary_polys_cap: Option<MerkleCap<F, C::Hasher>>,
     /// Merkle cap of LDEs of trace values.
@@ -58,6 +61,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize> S
 pub struct StarkProofTarget<const D: usize> {
     /// `Target` for the Merkle cap trace values LDEs.
     pub trace_cap: MerkleCapTarget,
+    /// `Target` for the Merkle cap phase 2 trace values LDEs.
+    pub p2_trace_cap: Option<MerkleCapTarget>,
     /// Optional `Target` for the Merkle cap of lookup helper and CTL columns LDEs, if any.
     pub auxiliary_polys_cap: Option<MerkleCapTarget>,
     /// `Target` for the Merkle cap of quotient polynomial evaluations LDEs.
@@ -88,6 +93,11 @@ impl<const D: usize> StarkProofTarget<D> {
     /// Deserializes a STARK proof.
     pub fn from_buffer(buffer: &mut Buffer) -> IoResult<Self> {
         let trace_cap = buffer.read_target_merkle_cap()?;
+        let p2_trace_cap = if buffer.read_bool()? {
+            Some(buffer.read_target_merkle_cap()?)
+        } else {
+            None
+        };
         let auxiliary_polys_cap = if buffer.read_bool()? {
             Some(buffer.read_target_merkle_cap()?)
         } else {
@@ -103,6 +113,7 @@ impl<const D: usize> StarkProofTarget<D> {
 
         Ok(Self {
             trace_cap,
+            p2_trace_cap,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -122,7 +133,7 @@ impl<const D: usize> StarkProofTarget<D> {
 }
 
 /// Merkle caps and openings that form the proof of a single STARK, along with its public inputs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StarkProofWithPublicInputs<
     F: RichField + Extendable<D>,
     C: GenericConfig<D, F = F>,
@@ -174,7 +185,7 @@ pub struct CompressedStarkProofWithPublicInputs<
 
 /// A [`StarkProof`] along with metadata about the initial Fiat-Shamir state, which is used when
 /// creating a recursive wrapper proof around a STARK proof.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StarkProofWithMetadata<F, C, const D: usize>
 where
     F: RichField + Extendable<D>,
@@ -214,6 +225,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize, c
 /// Randomness used for a STARK proof.
 #[derive(Debug)]
 pub struct StarkProofChallenges<F: RichField + Extendable<D>, const D: usize> {
+    /// Optional randomness used in 2-phase trace values RLC
+    pub random_gamma: Option<F::Extension>,
     /// Optional randomness used in any permutation argument.
     pub lookup_challenge_set: Option<GrandProductChallengeSet<F>>,
     /// Random values used to combine STARK constraints.
@@ -227,6 +240,8 @@ pub struct StarkProofChallenges<F: RichField + Extendable<D>, const D: usize> {
 /// Circuit version of [`StarkProofChallenges`].
 #[derive(Debug)]
 pub struct StarkProofChallengesTarget<const D: usize> {
+    /// Optional randomness used in 2-phase trace values RLC
+    pub random_gamma: Option<ExtensionTarget<D>>,
     /// Optional `Target`'s randomness used in any permutation argument.
     pub lookup_challenge_set: Option<GrandProductChallengeSet<Target>>,
     /// `Target`s for the random values used to combine STARK constraints.
@@ -247,12 +262,16 @@ pub struct MultiProofChallenges<F: RichField + Extendable<D>, const D: usize, co
 }
 
 /// Purported values of each polynomial at the challenge point.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct StarkOpeningSet<F: RichField + Extendable<D>, const D: usize> {
     /// Openings of trace polynomials at `zeta`.
     pub local_values: Vec<F::Extension>,
     /// Openings of trace polynomials at `g * zeta`.
     pub next_values: Vec<F::Extension>,
+    /// Openings of phase 2 trace polynomials at `zeta`.
+    pub p2_local_values: Option<Vec<F::Extension>>,
+    /// Openings of phase 2 trace polynomials at `g * zeta`.
+    pub p2_next_values: Option<Vec<F::Extension>>,
     /// Openings of lookups and cross-table lookups `Z` polynomials at `zeta`.
     pub auxiliary_polys: Option<Vec<F::Extension>>,
     /// Openings of lookups and cross-table lookups `Z` polynomials at `g * zeta`.
@@ -272,6 +291,7 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
         zeta: F::Extension,
         g: F,
         trace_commitment: &PolynomialBatch<F, C, D>,
+        p2_trace_commitment: Option<&PolynomialBatch<F, C, D>>,
         auxiliary_polys_commitment: Option<&PolynomialBatch<F, C, D>>,
         quotient_commitment: Option<&PolynomialBatch<F, C, D>>,
         num_lookup_columns: usize,
@@ -299,6 +319,8 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
         Self {
             local_values: eval_commitment(zeta, trace_commitment),
             next_values: eval_commitment(zeta_next, trace_commitment),
+            p2_local_values: p2_trace_commitment.map(|c| eval_commitment(zeta, c)),
+            p2_next_values: p2_trace_commitment.map(|c| eval_commitment(zeta_next, c)),
             auxiliary_polys: auxiliary_polys_commitment.map(|c| eval_commitment(zeta, c)),
             auxiliary_polys_next: auxiliary_polys_commitment.map(|c| eval_commitment(zeta_next, c)),
             ctl_zs_first: requires_ctl.then(|| {
@@ -311,11 +333,12 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
 
     /// Constructs the openings required by FRI.
     /// All openings but `ctl_zs_first` are grouped together.
-    pub(crate) fn to_fri_openings(&self) -> FriOpenings<F, D> {
+    pub fn to_fri_openings(&self) -> FriOpenings<F, D> {
         let zeta_batch = FriOpeningBatch {
             values: self
                 .local_values
                 .iter()
+                .chain(self.p2_local_values.iter().flatten())
                 .chain(self.auxiliary_polys.iter().flatten())
                 .chain(self.quotient_polys.iter().flatten())
                 .copied()
@@ -325,10 +348,12 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
             values: self
                 .next_values
                 .iter()
+                .chain(self.p2_next_values.iter().flatten())
                 .chain(self.auxiliary_polys_next.iter().flatten())
                 .copied()
                 .collect_vec(),
         };
+
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
@@ -360,6 +385,10 @@ pub struct StarkOpeningSetTarget<const D: usize> {
     pub local_values: Vec<ExtensionTarget<D>>,
     /// `ExtensionTarget`s for the opening of trace polynomials at `g * zeta`.
     pub next_values: Vec<ExtensionTarget<D>>,
+    /// `ExtensionTarget`s for the phase 2 trace openings of trace polynomials at `zeta`.
+    pub p2_local_values: Option<Vec<ExtensionTarget<D>>>,
+    /// `ExtensionTarget`s for the phase 2 trace opening of trace polynomials at `g * zeta`.
+    pub p2_next_values: Option<Vec<ExtensionTarget<D>>>,
     /// `ExtensionTarget`s for the opening of lookups and cross-table lookups `Z` polynomials at `zeta`.
     pub auxiliary_polys: Option<Vec<ExtensionTarget<D>>>,
     /// `ExtensionTarget`s for the opening of lookups and cross-table lookups `Z` polynomials at `g * zeta`.
@@ -404,6 +433,16 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
     pub(crate) fn from_buffer(buffer: &mut Buffer) -> IoResult<Self> {
         let local_values = buffer.read_target_ext_vec::<D>()?;
         let next_values = buffer.read_target_ext_vec::<D>()?;
+        let p2_local_values = if buffer.read_bool()? {
+            Some(buffer.read_target_ext_vec::<D>()?)
+        } else {
+            None
+        };
+        let p2_next_values = if buffer.read_bool()? {
+            Some(buffer.read_target_ext_vec::<D>()?)
+        } else {
+            None
+        };
         let auxiliary_polys = if buffer.read_bool()? {
             Some(buffer.read_target_ext_vec::<D>()?)
         } else {
@@ -428,6 +467,8 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
         Ok(Self {
             local_values,
             next_values,
+            p2_local_values,
+            p2_next_values,
             auxiliary_polys,
             auxiliary_polys_next,
             ctl_zs_first,
@@ -436,11 +477,12 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
     }
 
     /// Circuit version of `to_fri_openings`for [`FriOpeningsTarget`].
-    pub(crate) fn to_fri_openings(&self, zero: Target) -> FriOpeningsTarget<D> {
+    pub fn to_fri_openings(&self, zero: Target) -> FriOpeningsTarget<D> {
         let zeta_batch = FriOpeningBatchTarget {
             values: self
                 .local_values
                 .iter()
+                .chain(self.p2_local_values.iter().flatten())
                 .chain(self.auxiliary_polys.iter().flatten())
                 .chain(self.quotient_polys.iter().flatten())
                 .copied()
@@ -450,6 +492,7 @@ impl<const D: usize> StarkOpeningSetTarget<D> {
             values: self
                 .next_values
                 .iter()
+                .chain(self.p2_next_values.iter().flatten())
                 .chain(self.auxiliary_polys_next.iter().flatten())
                 .copied()
                 .collect_vec(),

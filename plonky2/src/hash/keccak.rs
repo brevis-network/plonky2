@@ -4,6 +4,7 @@ use core::mem::size_of;
 
 use itertools::Itertools;
 use keccak_hash::keccak;
+use serde::Serialize;
 
 use crate::hash::hash_types::{BytesHash, RichField};
 use crate::hash::hashing::PlonkyPermutation;
@@ -17,7 +18,7 @@ pub const SPONGE_WIDTH: usize = SPONGE_RATE + SPONGE_CAPACITY;
 /// Keccak-256 pseudo-permutation (not necessarily one-to-one) used in the challenger.
 /// A state `input: [F; 12]` is sent to the field representation of `H(input) || H(H(input)) || H(H(H(input)))`
 /// where `H` is the Keccak-256 hash.
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Serialize)]
 pub struct KeccakPermutation<F: RichField> {
     state: [F; SPONGE_WIDTH],
 }

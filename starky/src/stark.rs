@@ -3,7 +3,6 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
-
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::field::types::Field;
@@ -17,8 +16,9 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 
 use crate::config::StarkConfig;
 use crate::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
-use crate::evaluation_frame::StarkEvaluationFrame;
-use crate::lookup::Lookup;
+use crate::evaluation_frame::{StarkEvaluationFrame};
+use crate::lookup::{Column, Filter, Lookup};
+
 
 /// Represents a STARK system.
 pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
@@ -26,6 +26,11 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     const COLUMNS: usize = Self::EvaluationFrameTarget::COLUMNS;
     /// The total number of public inputs.
     const PUBLIC_INPUTS: usize = Self::EvaluationFrameTarget::PUBLIC_INPUTS;
+
+    /// The total number of columns in the phase 2 trace.
+    const P2_COLUMNS: usize = Self::P2EvaluationFrameTarget::COLUMNS;
+    /// The total number of public inputs in the phase 2 trace.
+    const P2_PUBLIC_INPUTS: usize = Self::P2EvaluationFrameTarget::PUBLIC_INPUTS;
 
     /// This is used to evaluate constraints natively.
     type EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
@@ -36,6 +41,15 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate constraints recursively.
     type EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
 
+    /// This is used to phase 2 evaluate constraints natively.
+    type P2EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
+    where
+        FE: FieldExtension<D2, BaseField = F>,
+        P: PackedField<Scalar = FE> ;
+
+    /// The `Target` version of `Self::EvaluationFrame`, used to evaluate phase 2 constraints recursively.
+    type P2EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
+
     /// Evaluates constraints at a vector of points.
     ///
     /// The points are elements of a field `FE`, a degree `D2` extension of `F`. This lets us
@@ -45,6 +59,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
@@ -56,7 +72,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F, P, 1>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) {
-        self.eval_packed_generic(vars, yield_constr)
+        self.eval_packed_generic(vars,None, None, yield_constr)
     }
 
     /// Evaluates constraints at a single point from the degree `D` extension field.
@@ -65,7 +81,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F::Extension, F::Extension, D>,
         yield_constr: &mut ConstraintConsumer<F::Extension>,
     ) {
-        self.eval_packed_generic(vars, yield_constr)
+        self.eval_packed_generic(vars, None, None, yield_constr)
     }
 
     /// Evaluates constraints at a vector of points from the degree `D` extension field.
@@ -76,6 +92,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         &self,
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
+        p2_vars: Option<&Self::P2EvaluationFrameTarget>,
+        random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     );
 
@@ -112,6 +130,17 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             blinding: false,
         });
 
+        let p2_trace_info = if self.use_phase2() {
+            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            p2_trace_polys
+        } else {
+            vec![]
+        };
+
         let num_lookup_columns = self.num_lookup_helper_columns(config);
         let num_auxiliary_polys = num_lookup_columns + num_ctl_helpers + num_ctl_zs.len();
         let auxiliary_polys_info = if self.uses_lookups() || self.requires_ctls() {
@@ -142,6 +171,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             point: zeta,
             polynomials: [
                 trace_info.clone(),
+                p2_trace_info.clone(),
                 auxiliary_polys_info.clone(),
                 quotient_info,
             ]
@@ -149,14 +179,15 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         };
         let zeta_next_batch = FriBatchInfo {
             point: zeta.scalar_mul(g),
-            polynomials: [trace_info, auxiliary_polys_info].concat(),
+            polynomials: [trace_info, p2_trace_info, auxiliary_polys_info].concat(),
         };
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
         if self.requires_ctls() {
+            let oracle_index = if self.use_phase2() {2} else {1};
             let ctl_zs_info = FriPolynomialInfo::from_range(
-                1, // auxiliary oracle index
+                oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helpers..num_auxiliary_polys,
             );
             let ctl_first_batch = FriBatchInfo {
@@ -187,6 +218,16 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             blinding: false,
         });
 
+        let p2_trace_info  = if self.use_phase2() {
+            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            p2_trace_polys
+        } else {
+            vec![]
+        };
         let num_lookup_columns = self.num_lookup_helper_columns(config);
         let num_auxiliary_polys = num_lookup_columns + num_ctl_helper_polys + num_ctl_zs;
         let auxiliary_polys_info = if self.uses_lookups() || self.requires_ctls() {
@@ -217,6 +258,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             point: zeta,
             polynomials: [
                 trace_info.clone(),
+                p2_trace_info.clone(),
                 auxiliary_polys_info.clone(),
                 quotient_info,
             ]
@@ -225,14 +267,15 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         let zeta_next = builder.mul_const_extension(g, zeta);
         let zeta_next_batch = FriBatchInfoTarget {
             point: zeta_next,
-            polynomials: [trace_info, auxiliary_polys_info].concat(),
+            polynomials: [trace_info, p2_trace_info, auxiliary_polys_info].concat(),
         };
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
         if self.requires_ctls() {
+            let oracle_index = if self.use_phase2() {2} else {1};
             let ctl_zs_info = FriPolynomialInfo::from_range(
-                1, // auxiliary oracle index
+                oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helper_polys..num_auxiliary_polys,
             );
             let ctl_first_batch = FriBatchInfoTarget {
@@ -250,6 +293,17 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     fn lookups(&self) -> Vec<Lookup<F>> {
         vec![]
     }
+
+    /// Outputs all Cross LookUp Columns this table needs to perform
+    fn ctl_columns(&self) -> Vec<Column<F>> {
+        vec![]
+    }
+
+    /// CTL filter for the final block rows of the table.
+    fn ctl_filter(&self) -> Filter<F> {
+        Filter::default()
+    }
+
 
     /// Outputs the number of total lookup helper columns, based on this STARK's vector
     /// of [`Lookup`] and the number of challenges used by this [`StarkConfig`].
@@ -273,5 +327,10 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// It defaults to `false`, i.e. for simple uni-STARK systems.
     fn requires_ctls(&self) -> bool {
         false
+    }
+
+    /// if 2 phase trace is enable
+    fn use_phase2(&self) -> bool {
+        Self::P2_COLUMNS > 0
     }
 }
