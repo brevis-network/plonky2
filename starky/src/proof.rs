@@ -6,6 +6,7 @@
 use alloc::{vec, vec::Vec};
 
 use itertools::Itertools;
+use serde::Serialize;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::fri::oracle::PolynomialBatch;
 use plonky2::fri::proof::{
@@ -21,7 +22,6 @@ use plonky2::iop::target::Target;
 use plonky2::plonk::config::{GenericConfig, Hasher};
 use plonky2::util::serialization::{Buffer, IoResult, Read, Write};
 use plonky2_maybe_rayon::*;
-use serde::{Deserialize, Serialize};
 
 use crate::config::StarkConfig;
 use crate::lookup::GrandProductChallengeSet;

@@ -205,12 +205,16 @@ mod tests {
         )?;
         verify_stark_proof(stark, proof.clone(), &config)?;
 
-        recursive_proof::<F, C, S, C, D>(stark, proof, &config, true)
+        let _ = recursive_proof::<F, C, S, C, D>(stark, proof, &config, true);
+
+        println!("recursion done");
+
+        Ok(())
     }
 
     fn recursive_proof<
         F: RichField + Extendable<D>,
-        C: GenericConfig<D, F = F>,
+        C: GenericConfig<D, F = F> + serde::Serialize,
         S: Stark<F, D> + Copy,
         InnerC: GenericConfig<D, F = F>,
         const D: usize,
@@ -239,7 +243,23 @@ mod tests {
 
         let data = builder.build::<C>();
         let proof = data.prove(pw)?;
+
+        /*let common_data_file = File::create("common_circuit_data.json")?;
+        serde_json::to_writer_pretty(&common_data_file, &data.common)?;
+        println!("Succesfully wrote common circuit data to common_circuit_data.json");
+
+        let verifier_data_file = File::create("verifier_only_circuit_data.json")?;
+        serde_json::to_writer_pretty(&verifier_data_file, &data.verifier_only)?;
+        println!("Succesfully wrote verifier data to verifier_only_circuit_data.json");
+
+        let proof_file = File::create("proof_with_public_inputs.json")?;
+        serde_json::to_writer_pretty(&proof_file, &proof)?;
+        println!("Succesfully wrote proof to proof_with_public_inputs.json");*/
+
         data.verify(proof)
+
+
+
     }
 
     fn init_logger() {
