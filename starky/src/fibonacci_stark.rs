@@ -160,7 +160,7 @@ mod tests {
     use plonky2::util::timing::TimingTree;
 
     use std::time::{Duration, Instant};
-
+    use plonky2::recursion::wrapper_recursion::wrap_plonky2_proof;
     use crate::config::StarkConfig;
     use crate::fibonacci_stark::FibonacciStark;
     use crate::proof::StarkProofWithPublicInputs;
@@ -262,7 +262,7 @@ mod tests {
         // this recursive proof will be wrapped
         println!("recursive proof size: {} bytes {}KB", bincode::serialize(&r_p).unwrap().len(), bincode::serialize(&r_p).unwrap().len()/1024);
 
-        let (w_p, w_v, w_c) = recursive_plonky2_proof::<F, C2, C, D>(r_p, r_v, r_c)?;
+        let (w_p, w_v, w_c) = wrap_plonky2_proof::<F, C2, C, D>(r_p, r_v, r_c)?;
         println!("wrapper proof size: {} bytes {}KB", bincode::serialize(&w_p).unwrap().len(), bincode::serialize(&w_p).unwrap().len()/1024);
 
         let common_data_file = File::create("common_circuit_data.json")?;
@@ -379,7 +379,7 @@ mod tests {
         CommonCircuitData<F, D>,
     );
 
-    fn recursive_plonky2_proof<
+    pub fn recursive_plonky2_proof<
         F: RichField + Extendable<D>,
         C: GenericConfig<D, F = F>,
         InnerC: GenericConfig<D, F = F>,
