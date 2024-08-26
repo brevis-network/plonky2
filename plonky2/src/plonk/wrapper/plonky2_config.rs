@@ -122,7 +122,7 @@ impl<'de, F: RichField> Deserialize<'de> for PoseidonBN128HashOut<F> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PoseidonBN128Hash;
 impl<F: RichField> Hasher<F> for PoseidonBN128Hash {
     const HASH_SIZE: usize = 32; // Hash output is 4 limbs of u64
