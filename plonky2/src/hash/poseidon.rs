@@ -871,7 +871,7 @@ impl<T: Copy + Debug + Default + Eq + Permuter + Send + Sync + Serialize> Plonky
 }
 
 /// Poseidon hash function.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PoseidonHash;
 impl<F: RichField> Hasher<F> for PoseidonHash {
     const HASH_SIZE: usize = 4 * 8;

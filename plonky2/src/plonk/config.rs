@@ -33,7 +33,7 @@ pub trait GenericHashOut<F: RichField>:
 }
 
 /// Trait for hash functions.
-pub trait Hasher<F: RichField>: Sized + Copy + Debug + Eq + PartialEq {
+pub trait Hasher<F: RichField>: Sized + Copy + Debug + Eq + PartialEq + Serialize {
     /// Size of `Hash` in bytes.
     const HASH_SIZE: usize;
 

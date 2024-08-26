@@ -100,7 +100,7 @@ impl<F: RichField> PlonkyPermutation<F> for KeccakPermutation<F> {
 }
 
 /// Keccak-256 hash function.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct KeccakHash<const N: usize>;
 impl<F: RichField, const N: usize> Hasher<F> for KeccakHash<N> {
     const HASH_SIZE: usize = N;
