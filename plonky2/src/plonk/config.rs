@@ -93,7 +93,7 @@ pub trait AlgebraicHasher<F: RichField>: Hasher<F, Hash = HashOut<F>> {
 
 /// Generic configuration trait.
 pub trait GenericConfig<const D: usize>:
-    Debug + Clone + Sync + Sized + Send + Eq + PartialEq
+    Debug + Clone + Sync + Sized + Send + Eq + PartialEq + Serialize
 {
     /// Main field.
     type F: RichField + Extendable<D, Extension = Self::FE>;
@@ -116,7 +116,7 @@ impl GenericConfig<2> for PoseidonGoldilocksConfig {
 }
 
 /// Configuration using truncated Keccak over the Goldilocks field.
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
 pub struct KeccakGoldilocksConfig;
 impl GenericConfig<2> for KeccakGoldilocksConfig {
     type F = GoldilocksField;
