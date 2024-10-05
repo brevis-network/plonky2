@@ -105,6 +105,7 @@ pub mod default {
     use crate::gates::lookup_table::LookupTableGate;
     use crate::gates::multiplication_extension::MulExtensionGate;
     use crate::gates::noop::NoopGate;
+    use crate::gates::poseidon2_gate::Poseidon2Gate;
     use crate::gates::poseidon::PoseidonGate;
     use crate::gates::poseidon_mds::PoseidonMdsGate;
     use crate::gates::public_input::PublicInputGate;
@@ -142,7 +143,8 @@ pub mod default {
             PublicInputGate,
             RandomAccessGate<F, D>,
             ReducingExtensionGate<D>,
-            ReducingGate<D>
+            ReducingGate<D>,
+            Poseidon2Gate<F, D>
         }
     }
 }
