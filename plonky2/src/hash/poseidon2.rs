@@ -403,7 +403,7 @@ pub trait Poseidon2: PrimeField64 {
     ) where
         Self: RichField + Extendable<D>,
     {
-        for i in 0..3 {
+        for i in 0..2 {
             let t_0 =
                 builder.mul_const_add_extension(Self::ONE, input[i * 4 + 0], input[i * 4 + 1]);
             let t_1 =
