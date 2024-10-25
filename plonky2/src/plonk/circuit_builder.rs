@@ -1013,14 +1013,14 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
             .print(self.num_gates());
 
         // Print total count of each gate type.
-        debug!("Total gate counts:");
+        println!("Total gate counts:");
         for gate in self.gates.iter().cloned() {
             let count = self
                 .gate_instances
                 .iter()
                 .filter(|inst| inst.gate_ref == gate)
                 .count();
-            debug!("- {} instances of {}", count, gate.0.id());
+            println!("- {} instances of {}", count, gate.0.id());
         }
     }
 
