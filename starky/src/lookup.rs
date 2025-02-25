@@ -348,12 +348,12 @@ impl<F: Field> Column<F> {
         }
         self.linear_combination
             .iter()
-            .map(|&(c, f)| table[c].values[row] * f)
+            .map(|&(c, f)| table_vals[c].values[row] * f)
             .sum::<F>()
             + self
                 .next_row_linear_combination
                 .iter()
-                .map(|&(c, f)| table[c].values[(row + 1) % table[c].values.len()] * f)
+                .map(|&(c, f)| table_vals[c].values[(row + 1) % table_vals[c].values.len()] * f)
                 .sum::<F>()
             + self.constant
     }
