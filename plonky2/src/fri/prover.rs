@@ -1,6 +1,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
+use log::debug;
 use plonky2_maybe_rayon::*;
 
 use crate::field::extension::{flatten, unflatten, Extendable};
@@ -171,11 +172,16 @@ fn fri_prover_query_rounds<
     n: usize,
     fri_params: &FriParams,
 ) -> Vec<FriQueryRound<F, C::Hasher, D>> {
+    debug!("number query rounds: {:?}", fri_params.config.num_query_rounds);
     challenger
         .get_n_challenges(fri_params.config.num_query_rounds)
         .into_par_iter()
         .map(|rand| {
             let x_index = rand.to_canonical_u64() as usize % n;
+            debug!("x_index: {:?}, rand: {:?}, n: {:?}", x_index, rand, n);
+            initial_merkle_trees.iter().for_each(|t: &&MerkleTree<F, <C as GenericConfig<D>>::Hasher>| {
+                debug!("t leaves: {:?}, x_index: {:?}", t.leaves.len(), x_index);
+            });
             fri_prover_query_round::<F, C, D>(initial_merkle_trees, trees, x_index, fri_params)
         })
         .collect()

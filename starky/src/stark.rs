@@ -3,6 +3,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
+use log::debug;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::field::types::Field;
@@ -41,14 +42,20 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate constraints recursively.
     type EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
 
-    /// This is used to phase 2 evaluate constraints natively.
+    /// This is used to phase 2 evaluate constraints natively.x
     type P2EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
     where
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE> ;
 
+
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate phase 2 constraints recursively.
     type P2EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
+
+    /// for test purpose, return the name of the Stark
+    fn name(&self) -> &'static str {
+        "Stark"
+    }
 
     /// Evaluates constraints at a vector of points.
     ///
@@ -66,6 +73,18 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         FE: FieldExtension<D2, BaseField = F>,
         P: PackedField<Scalar = FE>;
 
+    /// Evaluates constraints at a vector of points with the challenge.
+    fn eval_packed_with_challenge<FE, P, const D2: usize>(
+        &self,
+        vars: &Self::EvaluationFrame<FE, P, D2>,
+        p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
+        random_gamma: Option<&FE>,
+        yield_constr: &mut ConstraintConsumer<P>,
+    ) where
+        FE: FieldExtension<D2, BaseField = F>,
+        P: PackedField<Scalar = FE> {
+    }
+    
     /// Evaluates constraints at a vector of points from the base field `F`.
     fn eval_packed_base<P: PackedField<Scalar = F>>(
         &self,
@@ -131,13 +150,30 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         });
 
         let p2_trace_info = if self.use_phase2() {
-            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-            oracles.push(FriOracleInfo {
-                num_polys: Self::P2_COLUMNS,
-                blinding: false,
-            });
-            p2_trace_polys
-        } else {
+            if Self::name(&self) == "receipt_mpt_stark" || Self::name(&self) == "extension_type_stark" {
+                debug!("receipt_mpt_stark create fri instance");
+                let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                let p2_trace_polys_2 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
+                p2_trace_polys
+            } else {
+                let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                p2_trace_polys
+            }
+            
+        } else { 
             vec![]
         };
 
@@ -185,7 +221,11 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
         if self.requires_ctls() {
-            let oracle_index = if self.use_phase2() {2} else {1};
+            let mut oracle_index: usize = if self.use_phase2() {2} else {1};
+
+            if Self::name(&self) == "receipt_mpt_stark" || Self::name(&self) == "extension_type_stark" {
+                oracle_index  = if self.use_phase2() {3} else {1};
+            }
             let ctl_zs_info = FriPolynomialInfo::from_range(
                 oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helpers..num_auxiliary_polys,

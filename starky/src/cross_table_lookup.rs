@@ -345,11 +345,13 @@ pub(crate) fn cross_table_lookup_data<'a, F: RichField, const D: usize, const N:
                 constraint_degree,
             );
 
-            let p2_trace = p2_trace_poly_values.is_some().then(|| p2_trace_poly_values.unwrap()[looked_table.table].as_ref());
+            let p2_trace = p2_trace_poly_values.and_then(|p2_trace_poly_values| {
+                Some(p2_trace_poly_values[looked_table.table].as_slice())
+            });
 
             let z_looked = partial_sums(
                 &trace_poly_values[looked_table.table],
-                p2_trace,
+                p2_trace.map(|v| v),
                 &[(&looked_table.columns, &looked_table.filter)],
                 challenge,
                 constraint_degree,
@@ -412,8 +414,9 @@ fn ctl_helper_zs_cols<F: Field, const N: usize>(
     grouped_lookups
         .into_iter()
         .map(|(table, group)| {
-            let all_p2_stark_traces = all_p2_stark_traces.is_some()
-                .then(|| all_p2_stark_traces.unwrap()[table].as_ref());
+            let all_p2_stark_traces = all_p2_stark_traces.and_then(|all_p2_stark_traces| {
+                Some(all_p2_stark_traces[table].as_slice())
+            });
 
             let columns_filters = group
                 .map(|table| (&table.columns[..], &table.filter))
@@ -456,7 +459,7 @@ fn partial_sums<F: Field>(
     let mut z = Vec::with_capacity(degree);
 
     let mut helper_columns =
-        get_helper_cols(trace,p2_trace, degree, columns_filters, challenge, constraint_degree);
+        get_helper_cols(trace, p2_trace, degree, columns_filters, challenge, constraint_degree);
 
     let x = helper_columns
         .iter()
@@ -644,7 +647,7 @@ impl<'a, F: RichField + Extendable<D>, const D: usize>
 /// and not the next. This enables CTLs across two rows.
 pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const D2: usize>(
     vars: &S::EvaluationFrame<FE, P, D2>,
-    p2_vars: Option<&S::P2EvaluationFrame<FE, P, D2>>,
+    p2_vars: Option<&[S::P2EvaluationFrame<FE, P, D2>]>,
     ctl_vars: &[CtlCheckVars<F, FE, P, D2>],
     consumer: &mut ConstraintConsumer<P>,
     constraint_degree: usize,
@@ -657,8 +660,17 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
 
-    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
-    let p2_next_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_next_values());
+    // concat p2_local_values items
+    let p2_local_values = p2_vars.and_then(|p2_vars| {
+        Some(p2_vars.iter().map(|p2_var| p2_var.get_local_values()).collect::<Vec<_>>())
+    });
+    let p2_local_values = p2_local_values.and_then(|p2_local_values| { Some(p2_local_values.concat()) });
+
+    let p2_next_values = p2_vars.and_then(|p2_vars| {
+        Some(p2_vars.iter().map(|p2_var| p2_var.get_next_values()).collect::<Vec<_>>())
+    });
+    let p2_next_values = p2_next_values.and_then(|p2_next_values| { Some(p2_next_values.concat()) });
+
 
     for lookup_vars in ctl_vars {
         let CtlCheckVars {
@@ -675,7 +687,7 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             .iter()
             .map(|col| {
                 col.iter()
-                    .map(|c| c.eval_with_next(local_values, next_values, p2_local_values, p2_next_values))
+                    .map(|c| c.eval_with_next(local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref()))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -686,8 +698,8 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             &evals,
             local_values,
             next_values,
-            p2_local_values,
-            p2_next_values,
+            p2_local_values.as_deref(),
+            p2_next_values.as_deref(),
             helper_columns,
             constraint_degree,
             challenges,
@@ -704,8 +716,8 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             let combin0 = challenges.combine(&evals[0]);
             let combin1 = challenges.combine(&evals[1]);
 
-            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
-            let f1 = filter[1].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
+            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
+            let f1 = filter[1].eval_filter(local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
 
             consumer
                 .constraint_last_row(combin0 * combin1 * *local_z - f0 * combin1 - f1 * combin0);
@@ -714,7 +726,7 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
             );
         } else {
             let combin0 = challenges.combine(&evals[0]);
-            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values, p2_next_values);
+            let f0 = filter[0].eval_filter(local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
             consumer.constraint_last_row(combin0 * *local_z - f0);
             consumer.constraint_transition(combin0 * (*local_z - *next_z) - f0);
         }
@@ -1136,7 +1148,7 @@ pub mod debug_utils {
                 let row = table
                     .columns
                     .iter()
-                    .map(|c| c.eval_table(trace, p2_trace, i))
+                    .map(|c| c.eval_table(trace, p2_trace,i))
                     .collect::<Vec<_>>();
                 multiset.entry(row).or_default().push((table.table, i));
             } else {

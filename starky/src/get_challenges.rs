@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::polynomial::PolynomialCoeffs;
 use plonky2::fri::proof::{FriProof, FriProofTarget};
@@ -28,7 +29,7 @@ fn get_challenges<F, C, const D: usize>(
     challenger: &mut Challenger<F, C::Hasher>,
     challenges: Option<&GrandProductChallengeSet<F>>,
     trace_cap: Option<&MerkleCap<F, C::Hasher>>,
-    p2_trace_cap: Option<&MerkleCap<F, C::Hasher>>,
+    p2_trace_caps: Option<Vec<MerkleCap<F, C::Hasher>>>,
     auxiliary_polys_cap: Option<&MerkleCap<F, C::Hasher>>,
     quotient_polys_cap: Option<&MerkleCap<F, C::Hasher>>,
     openings: &StarkOpeningSet<F, D>,
@@ -48,13 +49,19 @@ where
         challenger.observe_cap(cap);
     }
 
-    let mut random_gamma = None;
-    if let Some(p2_trace_cap) = &p2_trace_cap {
-        let random_f = challenger.get_challenge();
-        let random_ext = F::Extension::from_basefield(random_f);
-        random_gamma = Some(random_ext);
-        challenger.observe_cap(p2_trace_cap);
-    }
+    let random_gammas = &p2_trace_caps.and_then(|p2_trace_caps| {
+        let mut gammas = vec![];
+
+        p2_trace_caps.iter().for_each(|p2_trace_cap| {
+            // sample random gamma
+            let random_f = challenger.get_challenge();
+            gammas.push( F::Extension::from_basefield(random_f));
+
+            // observe trace cap
+            challenger.observe_cap(p2_trace_cap);
+        });
+        Some(gammas)
+    });
 
     let lookup_challenge_set = if let Some(&challenges) = challenges.as_ref() {
         Some(challenges.clone())
@@ -78,7 +85,7 @@ where
     challenger.observe_openings(&openings.to_fri_openings());
 
     StarkProofChallenges {
-        random_gamma,
+        random_gammas: random_gammas.clone(),
         lookup_challenge_set,
         stark_alphas,
         stark_zeta,
@@ -115,7 +122,7 @@ where
 
         let StarkProof {
             trace_cap,
-            p2_trace_cap,
+            p2_trace_caps,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -134,17 +141,17 @@ where
             Some(trace_cap)
         };
 
-        let p2_trace_cap_ref = if ignore_trace_cap || p2_trace_cap.is_none() {
+        let p2_trace_caps = if ignore_trace_cap || p2_trace_caps.is_none() {
             None
         } else {
-            Some(p2_trace_cap.as_ref().unwrap())
+            p2_trace_caps.as_ref().map(|v| v.clone())
         };
 
         get_challenges::<F, C, D>(
             challenger,
             challenges,
             trace_cap,
-            p2_trace_cap_ref,
+            p2_trace_caps,
             auxiliary_polys_cap.as_ref(),
             quotient_polys_cap.as_ref(),
             openings,
@@ -189,7 +196,7 @@ fn get_challenges_target<F, C, const D: usize>(
     challenger: &mut RecursiveChallenger<F, C::Hasher, D>,
     challenges: Option<&GrandProductChallengeSet<Target>>,
     trace_cap: Option<&MerkleCapTarget>,
-    p2_trace_cap: Option<&MerkleCapTarget>,
+    p2_trace_caps: Option<&Vec<MerkleCapTarget>>,
     auxiliary_polys_cap: Option<&MerkleCapTarget>,
     quotient_polys_cap: Option<&MerkleCapTarget>,
     openings: &StarkOpeningSetTarget<D>,
@@ -209,13 +216,19 @@ where
         challenger.observe_cap(trace_cap);
     }
 
-    let mut random_gamma = None;
-    if let Some(p2_trace_cap) = &p2_trace_cap {
-        let random_f = challenger.get_challenge(builder);
-        let random_ext = random_f.to_ext_target(builder.zero());
-        random_gamma = Some(random_ext);
-        challenger.observe_cap(p2_trace_cap);
-    }
+    let random_gammas = &p2_trace_caps.and_then(|p2_trace_caps| {
+        let mut gammas = vec![];
+
+        p2_trace_caps.iter().for_each(|p2_trace_cap| {
+            // sample random gamma
+            let random_f = challenger.get_challenge(builder);
+            gammas.push(random_f.to_ext_target(builder.zero()));
+
+            // observe trace cap
+            challenger.observe_cap(p2_trace_cap);
+        });
+        Some(gammas)
+    });
 
     let lookup_challenge_set = if let Some(&challenges) = challenges.as_ref() {
         Some(challenges.clone())
@@ -239,7 +252,7 @@ where
     challenger.observe_openings(&openings.to_fri_openings(builder.zero()));
 
     StarkProofChallengesTarget {
-        random_gamma,
+        random_gamma: random_gammas.clone(),
         lookup_challenge_set,
         stark_alphas,
         stark_zeta,
@@ -276,7 +289,7 @@ impl<const D: usize> StarkProofTarget<D> {
     {
         let StarkProofTarget {
             trace_cap,
-            p2_trace_cap,
+            p2_trace_caps,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -295,10 +308,10 @@ impl<const D: usize> StarkProofTarget<D> {
             Some(trace_cap)
         };
 
-        let p2_trace_cap_ref = if ignore_trace_cap || p2_trace_cap.is_none() {
+        let p2_trace_cap_ref = if ignore_trace_cap || p2_trace_caps.is_none() {
             None
         } else {
-            Some(p2_trace_cap.as_ref().unwrap())
+            p2_trace_caps.as_ref()
         };
 
         get_challenges_target::<F, C, D>(

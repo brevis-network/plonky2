@@ -121,7 +121,7 @@ impl<F: Field> Filter<F> {
     pub(crate) fn eval_table(&self, table: &[PolynomialValues<F>],p2_table: Option<&[PolynomialValues<F>]>, row: usize) -> F {
         self.products
             .iter()
-            .map(|(col1, col2)| col1.eval_table(table,p2_table, row) * col2.eval_table(table,p2_table, row))
+            .map(|(col1, col2)| col1.eval_table(table, p2_table, row) * col2.eval_table(table,p2_table, row))
             .sum::<F>()
             + self
                 .constants
@@ -348,12 +348,12 @@ impl<F: Field> Column<F> {
         }
         self.linear_combination
             .iter()
-            .map(|&(c, f)| table_vals[c].values[row] * f)
+            .map(|&(c, f)| table[c].values[row] * f)
             .sum::<F>()
             + self
                 .next_row_linear_combination
                 .iter()
-                .map(|&(c, f)| table_vals[c].values[(row + 1) % table_vals[c].values.len()] * f)
+                .map(|&(c, f)| table[c].values[(row + 1) % table[c].values.len()] * f)
                 .sum::<F>()
             + self.constant
     }
@@ -764,13 +764,19 @@ pub(crate) fn eval_helper_columns_circuit<F: RichField + Extendable<D>, const D:
             .chunks(chunk_size)
             .zip(filter.chunks(chunk_size).zip(helper_columns))
         {
+            // let p2_local_values = p2_local_values.and_then(|p2_local_values| {
+            //     Some(p2_local_values.concat())
+            // });
+            // let p2_next_values = p2_next_values.and_then(|p2_next_values| {
+            //     Some(p2_next_values.concat())
+            // });
             match chunk.len() {
                 2 => {
                     let combin0 = challenges.combine_circuit(builder, &chunk[0]);
                     let combin1 = challenges.combine_circuit(builder, &chunk[1]);
 
-                    let f0 = fs[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
-                    let f1 = fs[1].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
+                    let f0 = fs[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
+                    let f1 = fs[1].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
 
                     let constr = builder.mul_sub_extension(combin0, h, f0);
                     let constr = builder.mul_extension(constr, combin1);
@@ -781,7 +787,7 @@ pub(crate) fn eval_helper_columns_circuit<F: RichField + Extendable<D>, const D:
                 }
                 1 => {
                     let combin = challenges.combine_circuit(builder, &chunk[0]);
-                    let f0 = fs[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
+                    let f0 = fs[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
                     let constr = builder.mul_sub_extension(combin, h, f0);
                     consumer.constraint(builder, constr);
                 }
@@ -816,9 +822,10 @@ pub(crate) fn get_helper_cols<F: Field>(
                         .map(|d| {
                             let evals = col
                                 .iter()
-                                .map(|c| c.eval_table(trace,p2_trace, d))
+                                .map(|c| c.eval_table(trace, p2_trace, d))
                                 .collect::<Vec<F>>();
-                            challenge.combine(&evals)
+                            challenge.combine(&evals)  
+                            
                         })
                         .collect::<Vec<F>>();
 
@@ -857,7 +864,7 @@ pub(crate) fn eval_packed_lookups_generic<F, FE, P, S, const D: usize, const D2:
     stark: &S,
     lookups: &[Lookup<F>],
     vars: &S::EvaluationFrame<FE, P, D2>,
-    p2_vars: Option<&S::P2EvaluationFrame<FE, P, D2>>,
+    p2_vars: Option<&[S::P2EvaluationFrame<FE, P, D2>]>,
     lookup_vars: LookupCheckVars<F, FE, P, D2>,
     yield_constr: &mut ConstraintConsumer<P>,
 ) where
@@ -869,8 +876,32 @@ pub(crate) fn eval_packed_lookups_generic<F, FE, P, S, const D: usize, const D2:
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
 
-    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
-    let p2_next_values = p2_local_values.is_some().then(||p2_vars.unwrap().get_next_values());
+    // concat p2_local_values items
+    let p2_local_values = p2_vars.and_then(|p2_vars| {
+        let mut flattened_p2_local = vec![];
+        p2_vars
+            .iter()
+            .for_each(|p2_var| {
+                let res = p2_var.get_local_values();
+                flattened_p2_local.extend_from_slice(res);
+            });
+        Some(flattened_p2_local)
+    });
+
+    let p2_next_values = p2_vars.and_then(|p2_vars| {
+        let mut flattened_p2_next = vec![];
+        p2_vars
+            .iter()
+            .for_each(|p2_var| {
+                let res = p2_var.get_next_values();
+                flattened_p2_next.extend_from_slice(res);
+            });
+        Some(flattened_p2_next)
+    });
+
+    let p2_local_values = p2_local_values.as_ref().map(|vec| vec.as_slice());
+    let p2_next_values = p2_next_values.as_ref().map(|vec| vec.as_slice());
+
 
     let degree = stark.constraint_degree();
     let mut start = 0;
@@ -936,7 +967,7 @@ pub(crate) fn eval_ext_lookups_circuit<
     builder: &mut CircuitBuilder<F, D>,
     stark: &S,
     vars: &S::EvaluationFrameTarget,
-    p2_vars: Option<&S::P2EvaluationFrameTarget>,
+    p2_vars: Option<&[S::P2EvaluationFrameTarget]>,
     lookup_vars: LookupCheckVarsTarget<D>,
     yield_constr: &mut RecursiveConstraintConsumer<F, D>,
 ) {
@@ -945,8 +976,19 @@ pub(crate) fn eval_ext_lookups_circuit<
 
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
-    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
-    let p2_next_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_next_values());
+
+    let p2_local_values = p2_vars.and_then(|p2_vars| {
+        let p2_frame_vars = p2_vars.iter().map(|p2_var| p2_var.get_local_values()).collect::<Vec<_>>();
+        Some(p2_frame_vars.concat())
+    });
+
+    let p2_next_values = p2_vars.and_then(|p2_vars| {
+        let p2_frame_vars = p2_vars.iter().map(|p2_var| p2_var.get_next_values()).collect::<Vec<_>>();
+        Some(p2_frame_vars.concat())
+    });
+
+    // let p2_local_values = p2_local_values.as_ref().map(|vec| vec.as_slice());
+    let p2_next_values = p2_next_values.as_ref().map(|vec| vec.as_slice());
 
     let mut start = 0;
     for lookup in lookups {
@@ -954,7 +996,7 @@ pub(crate) fn eval_ext_lookups_circuit<
         let col_values = lookup
             .columns
             .iter()
-            .map(|col| vec![col.eval_with_next_circuit(builder, local_values, next_values, p2_local_values, p2_next_values)])
+            .map(|col| vec![col.eval_with_next_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref())])
             .collect::<Vec<_>>();
 
         for &challenge in &lookup_vars.challenges {
@@ -969,8 +1011,8 @@ pub(crate) fn eval_ext_lookups_circuit<
                 &col_values,
                 local_values,
                 next_values,
-                p2_local_values,
-                p2_next_values,
+                p2_local_values.as_deref(),
+                p2_next_values.as_deref(),
                 &lookup_vars.local_values[start..start + num_helper_columns - 1],
                 degree,
                 &grand_challenge,
@@ -982,7 +1024,7 @@ pub(crate) fn eval_ext_lookups_circuit<
             let next_z = lookup_vars.next_values[start + num_helper_columns - 1];
             let table_column = lookup
                 .table_column
-                .eval_circuit(builder, vars.get_local_values(), p2_local_values);
+                .eval_circuit(builder, vars.get_local_values(), p2_local_values.as_deref());
             let table_with_challenge = builder.add_extension(table_column, challenge);
             let mut y = builder.add_many_extension(
                 &lookup_vars.local_values[start..start + num_helper_columns - 1],
@@ -990,7 +1032,7 @@ pub(crate) fn eval_ext_lookups_circuit<
 
             let frequencies_column = lookup
                 .frequencies_column
-                .eval_circuit(builder, vars.get_local_values(), p2_local_values);
+                .eval_circuit(builder, vars.get_local_values(), p2_local_values.as_deref());
             y = builder.mul_extension(y, table_with_challenge);
             y = builder.sub_extension(y, frequencies_column);
 

@@ -2,6 +2,7 @@
 use alloc::{format, vec::Vec};
 
 use itertools::Itertools;
+use log::debug;
 use plonky2_field::types::Field;
 use plonky2_maybe_rayon::*;
 
@@ -67,7 +68,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             "IFFT",
             values.into_par_iter().map(|v| v.ifft()).collect::<Vec<_>>()
         );
-
+        debug!("IFFT done");
         Self::from_coeffs(
             coeffs,
             rate_bits,

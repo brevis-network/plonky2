@@ -96,3 +96,41 @@ Plonky2's default hash function is Poseidon, configured with 8 full rounds, 22 p
 - [Insertion](https://github.com/0xPolygonZero/plonky2-insertion), Plonky2 gadgets for insertion into a list
 - [u32](https://github.com/0xPolygonZero/plonky2-u32), Plonky2 gadgets for u32 arithmetic
 - [ECDSA](https://github.com/0xPolygonZero/plonky2-ecdsa), Plonky2 gadgets for the ECDSA algorithm
+
+
+The Extension Field is defined be $\gamma = g_0 + g_1 \cdot \sqrt{W}$ where $g_0, g_1 \in \text{GF}(p)$, ${W}$ = 7;
+
+Assume there are 3 column a, b and c in the column which <T> is a Goldilocks Field in trace. the gamma will be splited to 2 base fields $g_0$, $g_1$ here.
+
+The combination result:
+
+$\text{RLC}_i = \gamma \cdot a_i + \gamma^2 \cdot b_i + \gamma^3 \cdot c_i$
+
+Expanded into base field components:
+
+$\text{RLC}_i^{(0)} = a_i g_0 + b_i(g_0^2 + 7g_1^2) + c_i(g_0^3 + 21g_0g_1^2)$ 
+
+$\text{RLC}_i^{(1)} = a_i g_1 + b_i(2g_0g_1) + c_i(3g_0^2g_1 + 7g_1^3)$
+
+
+---------------------------
+And there is another proposal.
+
+The Extension Field is defined be $\gamma = g_0 + g_1 \cdot \sqrt{W}$ where $g_0, g_1 \in \text{GF}(p)$, ${W}$ = 7 in Goldilocks QuadraticExtension
+
+Assume there are 3 column a, b and c in the column which <T> is a Goldilocks Field in trace. the gamma will be splited to 2 base fields $g_0$, $g_1$ here.
+
+The combination result:
+
+$\text{RLC}_i = \gamma \cdot a_i + \gamma^2 \cdot b_i + \gamma^3 \cdot c_i$
+
+Expanded into base field components:
+
+$\text{RLC}_i^{(0)} = a_i g_0 + b_i(g_0^2 + 7g_1^2) + c_i(g_0^3 + 21g_0g_1^2)$ 
+
+$\text{RLC}_i^{(1)} = a_i g_1 + b_i(2g_0g_1) + c_i(3g_0^2g_1 + 7g_1^3)$
+
+
+$\text{RLC}_i^{(0)} = a_i g_0 + b_i(g_0^2 + 7g_1^2) + c_i(g_0^3 + 21g_0g_1^2) + d_i(g_0^4 + 42g_0^2g_1^2 + 49g_1^4)$
+
+$\text{RLC}_i^{(1)} = a_i g_1 + 2b_i g_0 g_1 + c_i(3g_0^2 g_1 + 7g_1^3) + d_i(4g_0^3 g_1 + 28g_0 g_1^3)$.

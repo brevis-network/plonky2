@@ -165,7 +165,8 @@ pub fn verify_stark_proof_with_challenges_circuit<
             builder,
             stark,
             &vars,
-            p2_vars,
+            // p2_vars,
+            None,
             challenges.random_gamma.clone(),
             lookup_vars,
             ctl_vars,
@@ -188,7 +189,7 @@ pub fn verify_stark_proof_with_challenges_circuit<
     }
 
     let merkle_caps = once(proof.trace_cap.clone())
-        .chain(proof.p2_trace_cap.clone())
+        .chain(proof.p2_trace_caps.clone().into_iter().flatten())
         .chain(proof.auxiliary_polys_cap.clone())
         .chain(proof.quotient_polys_cap.clone())
         .collect_vec();
@@ -294,7 +295,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 
     StarkProofTarget {
         trace_cap: builder.add_virtual_cap(cap_height),
-        p2_trace_cap,
+        // p2_trace_cap,
+        p2_trace_caps: None,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings: add_virtual_stark_opening_set::<F, S, D>(
@@ -387,8 +389,8 @@ pub fn set_stark_proof_target<F, C: GenericConfig<D, F = F>, W, const D: usize>(
     W: WitnessWrite<F>,
 {
     witness.set_cap_target(&proof_target.trace_cap, &proof.trace_cap);
-    if let (Some(p2_target_trace_cap), Some(p2_trace_cap)) = (&proof_target.p2_trace_cap, &proof.p2_trace_cap) {
-        witness.set_cap_target(p2_target_trace_cap, p2_trace_cap);
+    if let (Some(p2_target_trace_cap), Some(p2_trace_caps)) = (&proof_target.p2_trace_caps, &proof.p2_trace_caps) {
+        p2_target_trace_cap.into_iter().zip(p2_trace_caps).for_each(|(t, c)| witness.set_cap_target(t, c));
     }
     if let (Some(quotient_polys_cap_target), Some(quotient_polys_cap)) =
         (&proof_target.quotient_polys_cap, &proof.quotient_polys_cap)

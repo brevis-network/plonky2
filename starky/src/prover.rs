@@ -2,6 +2,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use log::debug;
 use core::iter::once;
 
 use anyhow::{ensure, Result};
@@ -102,9 +103,9 @@ pub fn prove_with_commitment<F, C, S, const D: usize>(
     config: &StarkConfig,
     trace_poly_values: &[PolynomialValues<F>],
     trace_commitment: &PolynomialBatch<F, C, D>,
-    p2_trace_poly_values: Option<&[PolynomialValues<F>]>,
-    p2_trace_commitment: Option<&PolynomialBatch<F, C, D>>,
-    random_gamma: Option<&F>,
+    p2_trace_poly_values: Option<&[Vec<PolynomialValues<F>>]>,
+    p2_trace_commitment: Option<&[PolynomialBatch<F, C, D>]>,
+    random_gamma: Option<&[F]>,
     ctl_data: Option<&CtlData<F>>,
     ctl_challenges: Option<&GrandProductChallengeSet<F>>,
     challenger: &mut Challenger<F, C::Hasher>,
@@ -145,6 +146,10 @@ where
         }
     });
 
+    let p2_trace_poly_values = p2_trace_poly_values.and_then(|p2_trace_poly_values| {
+        Some(p2_trace_poly_values.concat())
+    });
+
     let lookups = stark.lookups();
     let lookup_helper_columns = timed!(
         timing,
@@ -156,7 +161,7 @@ where
                     columns.extend(lookup_helper_columns(
                         lookup,
                         trace_poly_values,
-                        p2_trace_poly_values,
+                        p2_trace_poly_values.as_deref(),
                         challenge,
                         constraint_degree,
                     ));
@@ -201,6 +206,8 @@ where
         )
     });
 
+    debug!("commit auxiliary polys");
+
     let auxiliary_polys_cap = auxiliary_polys_commitment
         .as_ref()
         .map(|commit| commit.merkle_tree.cap.clone());
@@ -213,14 +220,16 @@ where
     let num_ctl_polys = ctl_data
         .map(|data| data.num_ctl_helper_polys())
         .unwrap_or_default();
+    debug!("num_ctl_polys: {:?}", num_ctl_polys);
 
     // This is an expensive check, hence is only run when `debug_assertions` are enabled.
     #[cfg(debug_assertions)]
     {
+        debug!("checking constraints");
         check_constraints(
             stark,
             trace_commitment,
-            p2_trace_commitment,
+            &p2_trace_commitment,
             random_gamma,
             public_inputs,
             &auxiliary_polys_commitment,
@@ -234,13 +243,14 @@ where
         );
     }
 
+    debug!("compute quotient polys");
     let quotient_polys = timed!(
         timing,
         "compute quotient polys",
         compute_quotient_polys::<F, <F as Packable>::Packing, C, S, D>(
             stark,
             trace_commitment,
-            p2_trace_commitment,
+            &p2_trace_commitment,
             random_gamma,
             &auxiliary_polys_commitment,
             lookup_challenges.as_ref(),
@@ -318,13 +328,16 @@ where
     // Get the FRI openings and observe them.
     challenger.observe_openings(&openings.to_fri_openings());
 
-
     let initial_merkle_trees = once(trace_commitment)
-        .chain(p2_trace_commitment)
+        .chain(p2_trace_commitment.into_iter().flatten())
         .chain(&auxiliary_polys_commitment)
         .chain(&quotient_commitment)
         .collect_vec();
+    debug!("oracle length: {}", initial_merkle_trees.len());
 
+    if p2_trace_commitment.is_some() {
+        debug!("p2_trace_commit length: {:?}", p2_trace_commitment.unwrap().len());
+    };
 
     let opening_proof = timed!(
         timing,
@@ -338,18 +351,17 @@ where
         )
     );
 
-    let p2_trace_cap = if p2_trace_commitment.is_none() {
-        None
-    } else {
-        Some(p2_trace_commitment.unwrap().merkle_tree.cap.clone())
-    };
+    let p2_trace_caps = p2_trace_commitment.map(|p2_trace_commitments| {
+        p2_trace_commitments
+            .iter()
+            .map(|commit| commit.merkle_tree.cap.clone())
+            .collect::<Vec<_>>()
+    });
 
-    if let Some(p2_trace_commitment) = p2_trace_commitment {
-    }
 
     let proof = StarkProof {
         trace_cap: trace_commitment.merkle_tree.cap.clone(),
-        p2_trace_cap,
+        p2_trace_caps,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings,
@@ -367,8 +379,8 @@ where
 fn compute_quotient_polys<'a, F, P, C, S, const D: usize>(
     stark: &S,
     trace_commitment: &'a PolynomialBatch<F, C, D>,
-    p2_trace_commit: Option<&'a PolynomialBatch<F, C, D>>,
-    random_gamma: Option<&F>,
+    p2_trace_commit_slices: &'a Option<&[PolynomialBatch<F, C, D>]>,
+    random_gamma: Option<&[F]>,
     auxiliary_polys_commitment: &'a Option<PolynomialBatch<F, C, D>>,
     lookup_challenges: Option<&'a Vec<F>>,
     lookups: &[Lookup<F>],
@@ -415,11 +427,15 @@ where
     let get_trace_values_packed =
         |i_start| -> Vec<P> { trace_commitment.get_lde_values_packed(i_start, step) };
 
-    let get_p2_trace_values_packed = |i_start| -> Vec<P> {
-        p2_trace_commit
-            .unwrap()
-            .get_lde_values_packed(i_start, step)
-    };
+    let get_p2_trace_values_packed_slice = p2_trace_commit_slices.and_then(|p2_trace_commits| {
+        let mut p2_trace_values_packed = vec![];
+        p2_trace_commits.iter().for_each(|trace_commit| {
+            let trace_values_packed =
+                |i_start| -> Vec<P> { trace_commit.get_lde_values_packed(i_start, step) };
+            p2_trace_values_packed.push(trace_values_packed);
+        });
+        Some(p2_trace_values_packed)
+    });
 
     // Last element of the subgroup.
     let last = F::primitive_root_of_unity(degree_bits).inverse();
@@ -458,16 +474,20 @@ where
                 public_inputs,
             );
 
-            let mut p2_frame = None;
-            if p2_trace_commit.is_some() {
-                p2_frame = Some(S::P2EvaluationFrame::from_values(
-                    &get_p2_trace_values_packed(i_start),
-                    &get_p2_trace_values_packed(i_next_start),
-                    &[], // todo: support public inputs in phase 2
-                ));
-            }
-
-            let p2_vars = p2_frame.as_ref();
+            let p2_vars = p2_trace_commit_slices.and_then(|p2_trace_commits| {
+                let mut p2_vars = vec![];
+                p2_trace_commits.iter().enumerate().for_each(|(idx, _)| {
+                    let get_p2_trace_values_packed =
+                        get_p2_trace_values_packed_slice.clone().unwrap()[idx];
+                    let p2_frame = S::P2EvaluationFrame::from_values(
+                        &get_p2_trace_values_packed(i_start),
+                        &get_p2_trace_values_packed(i_next_start),
+                        &[], // todo: support public inputs in phase 2
+                    );
+                    p2_vars.push(p2_frame);
+                });
+                Some(p2_vars)
+            });
 
             // Get the local and next row evaluations for the permutation argument,
             // as well as the associated challenges.
@@ -536,7 +556,7 @@ where
             eval_vanishing_poly::<F, F, P, S, D, 1>(
                 stark,
                 &vars,
-                p2_vars,
+                p2_vars.as_deref(),
                 random_gamma,
                 lookups,
                 lookup_vars,
@@ -583,8 +603,8 @@ where
 fn check_constraints<'a, F, C, S, const D: usize>(
     stark: &S,
     trace_commitment: &'a PolynomialBatch<F, C, D>,
-    p2_trace_commitment: Option<&'a PolynomialBatch<F, C, D>>,
-    random_gamma: Option<&F>,
+    p2_trace_commitment_slices: &'a Option<&[PolynomialBatch<F, C, D>]>,
+    random_gamma: Option<&[F]>,
     public_inputs: &[F],
     auxiliary_commitment: &'a Option<PolynomialBatch<F, C, D>>,
     lookup_challenges: Option<&'a Vec<F>>,
@@ -627,7 +647,15 @@ fn check_constraints<'a, F, C, S, const D: usize>(
 
     // Get batch evaluations of the trace and permutation polynomials over our subgroup.
     let trace_subgroup_evals = get_subgroup_evals(trace_commitment);
-    let p2_trace_subgroup_evals = p2_trace_commitment.map(get_subgroup_evals);
+
+    let p2_trace_subgroup_evals = p2_trace_commitment_slices.and_then(|trace_commit_slices| {
+        let p2_trace_subgroup_evals = trace_commit_slices
+            .iter()
+            .map(|p2_trace_commitment| get_subgroup_evals(p2_trace_commitment))
+            .collect::<Vec<_>>();
+        Some(p2_trace_subgroup_evals)
+    });
+
     let auxiliary_subgroup_evals = auxiliary_commitment.as_ref().map(get_subgroup_evals);
 
     // Last element of the subgroup.
@@ -655,19 +683,31 @@ fn check_constraints<'a, F, C, S, const D: usize>(
                 public_inputs,
             );
 
-            let mut p2_evaluation_frame = None;
+            let p2_vars = p2_trace_commitment_slices.and_then(|p2_trace_commits| {
+                let mut p2_vars = vec![];
+                p2_trace_commits.iter().enumerate().for_each(|(idx, _)| {
+                    let p2_trace_values_packed = &p2_trace_subgroup_evals.clone().unwrap()[idx];
+                    let p2_frame = S::P2EvaluationFrame::from_values(
+                        &p2_trace_values_packed[i],
+                        &p2_trace_values_packed[i_next],
+                        &[], // todo: support public inputs in phase 2
+                    );
+                    p2_vars.push(p2_frame);
+                });
+                Some(p2_vars)
+            });
 
-            if p2_trace_commitment.clone().is_some() {
-                p2_evaluation_frame = Some(
-                    S::P2EvaluationFrame::from_values(
-                        &p2_trace_subgroup_evals.clone().unwrap()[i],
-                        &p2_trace_subgroup_evals.clone().unwrap()[i_next],
-                        &[],
-                    )
-                );
-            }
+            // let mut p2_evaluation_frame = None;
 
-            let p2_vars = p2_evaluation_frame.as_ref();
+            // if p2_trace_commitment.clone().is_some() {
+            //     p2_evaluation_frame = Some(S::P2EvaluationFrame::from_values(
+            //         &p2_trace_subgroup_evals.clone().unwrap()[i],
+            //         &p2_trace_subgroup_evals.clone().unwrap()[i_next],
+            //         &[],
+            //     ));
+            // }
+
+            // let p2_vars = p2_evaluation_frame.as_ref();
 
             // Get the local and next row evaluations for the current STARK's permutation argument.
             let lookup_vars = lookup_challenges.map(|challenges| LookupCheckVars {
@@ -714,7 +754,7 @@ fn check_constraints<'a, F, C, S, const D: usize>(
             eval_vanishing_poly::<F, F, F, S, D, 1>(
                 stark,
                 &vars,
-                p2_vars,
+                p2_vars.as_deref(),
                 random_gamma,
                 lookups,
                 lookup_vars,

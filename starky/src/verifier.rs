@@ -110,11 +110,18 @@ where
     );
 
     let p2_vars = if stark.use_phase2() {
-        Some(S::P2EvaluationFrame::from_values(
-            p2_local_values.as_ref().unwrap(),
-            p2_next_values.as_ref().unwrap(),
-            &[], // todo: support public input in phase 2
-        ))
+        p2_local_values.clone().and_then(|p2_local_values| {
+            let p2_next_values = p2_next_values.as_ref().unwrap();
+            let frame_len = p2_local_values.len()/S::P2_COLUMNS;
+            let frames = (0..frame_len).map(|i| {
+                S::P2EvaluationFrame::from_values(
+                    &p2_local_values[i*S::P2_COLUMNS..(i+1)*S::P2_COLUMNS],
+                    &p2_next_values[i*S::P2_COLUMNS..(i+1)*S::P2_COLUMNS],
+                    &[],
+                )
+            }).collect_vec();
+            Some(frames)
+        })
     } else {
         None
     };
@@ -161,8 +168,8 @@ where
     eval_vanishing_poly::<F, F::Extension, F::Extension, S, D, D>(
         stark,
         &vars,
-        p2_vars.as_ref(),
-        challenges.random_gamma.as_ref(),
+        p2_vars.as_deref(),
+        challenges.random_gammas.as_deref(),
         &lookups,
         lookup_vars,
         ctl_vars,
@@ -191,7 +198,7 @@ where
     }
 
     let merkle_caps = once(proof.trace_cap.clone())
-        .chain(proof.p2_trace_cap.clone())
+        .chain(proof.p2_trace_caps.clone().into_iter().flatten())
         .chain(proof.auxiliary_polys_cap.clone())
         .chain(proof.quotient_polys_cap.clone())
         .collect_vec();
@@ -239,7 +246,7 @@ where
 
     let StarkProof {
         trace_cap,
-        p2_trace_cap,
+        p2_trace_caps: _p2_trace_caps,
         auxiliary_polys_cap,
         quotient_polys_cap,
         openings,
@@ -274,8 +281,13 @@ where
     ensure!(next_values.len() == S::COLUMNS);
 
     if let (Some(p2_local_values), Some(p2_next_values)) = (p2_local_values, p2_next_values) {
-        ensure!(p2_local_values.len() == S::P2_COLUMNS);
-        ensure!(p2_next_values.len() == S::P2_COLUMNS);
+        if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
+            ensure!(p2_local_values.len() == S::P2_COLUMNS * config.num_challenges);
+            ensure!(p2_next_values.len() == S::P2_COLUMNS * config.num_challenges);
+        } else {
+            ensure!(p2_local_values.len() == S::P2_COLUMNS);
+            ensure!(p2_next_values.len() == S::P2_COLUMNS);
+        }
     }
 
     ensure!(if let Some(quotient_polys) = quotient_polys {

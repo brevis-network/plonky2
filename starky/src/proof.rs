@@ -32,7 +32,7 @@ pub struct StarkProof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, 
     /// Merkle cap of LDEs of trace values.
     pub trace_cap: MerkleCap<F, C::Hasher>,
     /// Merkle cap of LDEs of phase 2 trace values.
-    pub p2_trace_cap: Option<MerkleCap<F, C::Hasher>>,
+    pub p2_trace_caps: Option<Vec<MerkleCap<F, C::Hasher>>>,
     /// Optional merkle cap of LDEs of permutation Z values, if any.
     pub auxiliary_polys_cap: Option<MerkleCap<F, C::Hasher>>,
     /// Merkle cap of LDEs of trace values.
@@ -62,7 +62,7 @@ pub struct StarkProofTarget<const D: usize> {
     /// `Target` for the Merkle cap trace values LDEs.
     pub trace_cap: MerkleCapTarget,
     /// `Target` for the Merkle cap phase 2 trace values LDEs.
-    pub p2_trace_cap: Option<MerkleCapTarget>,
+    pub p2_trace_caps: Option<Vec<MerkleCapTarget>>,
     /// Optional `Target` for the Merkle cap of lookup helper and CTL columns LDEs, if any.
     pub auxiliary_polys_cap: Option<MerkleCapTarget>,
     /// `Target` for the Merkle cap of quotient polynomial evaluations LDEs.
@@ -113,7 +113,7 @@ impl<const D: usize> StarkProofTarget<D> {
 
         Ok(Self {
             trace_cap,
-            p2_trace_cap,
+            p2_trace_caps: None,
             auxiliary_polys_cap,
             quotient_polys_cap,
             openings,
@@ -226,7 +226,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize, c
 #[derive(Debug)]
 pub struct StarkProofChallenges<F: RichField + Extendable<D>, const D: usize> {
     /// Optional randomness used in 2-phase trace values RLC
-    pub random_gamma: Option<F::Extension>,
+    pub random_gammas: Option<Vec<F::Extension>>,
     /// Optional randomness used in any permutation argument.
     pub lookup_challenge_set: Option<GrandProductChallengeSet<F>>,
     /// Random values used to combine STARK constraints.
@@ -241,7 +241,7 @@ pub struct StarkProofChallenges<F: RichField + Extendable<D>, const D: usize> {
 #[derive(Debug)]
 pub struct StarkProofChallengesTarget<const D: usize> {
     /// Optional randomness used in 2-phase trace values RLC
-    pub random_gamma: Option<ExtensionTarget<D>>,
+    pub random_gamma: Option<Vec<ExtensionTarget<D>>>,
     /// Optional `Target`'s randomness used in any permutation argument.
     pub lookup_challenge_set: Option<GrandProductChallengeSet<Target>>,
     /// `Target`s for the random values used to combine STARK constraints.
@@ -291,7 +291,7 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
         zeta: F::Extension,
         g: F,
         trace_commitment: &PolynomialBatch<F, C, D>,
-        p2_trace_commitment: Option<&PolynomialBatch<F, C, D>>,
+        p2_trace_commitment: Option<&[PolynomialBatch<F, C, D>]>,
         auxiliary_polys_commitment: Option<&PolynomialBatch<F, C, D>>,
         quotient_commitment: Option<&PolynomialBatch<F, C, D>>,
         num_lookup_columns: usize,
@@ -316,11 +316,32 @@ impl<F: RichField + Extendable<D>, const D: usize> StarkOpeningSet<F, D> {
         let auxiliary_first = auxiliary_polys_commitment.map(|c| eval_commitment_base(F::ONE, c));
         // `g * zeta`.
         let zeta_next = zeta.scalar_mul(g);
+
+        let p2_local_values = p2_trace_commitment.map(|c| {
+            c.iter()
+                .map(|c| eval_commitment(zeta, c))
+                .collect_vec()
+        });
+
+        let p2_local_values = p2_local_values.and_then(|p2_local_values| {
+            Some(p2_local_values.concat())
+        });
+
+        let p2_next_values = p2_trace_commitment.map(|c| {
+            c.iter()
+                .map(|c| eval_commitment(zeta_next, c))
+                .collect_vec()
+        });
+
+        let p2_next_values = p2_next_values.and_then(|p2_next_values| {
+            Some(p2_next_values.concat())
+        });
+
         Self {
             local_values: eval_commitment(zeta, trace_commitment),
             next_values: eval_commitment(zeta_next, trace_commitment),
-            p2_local_values: p2_trace_commitment.map(|c| eval_commitment(zeta, c)),
-            p2_next_values: p2_trace_commitment.map(|c| eval_commitment(zeta_next, c)),
+            p2_local_values,
+            p2_next_values,
             auxiliary_polys: auxiliary_polys_commitment.map(|c| eval_commitment(zeta, c)),
             auxiliary_polys_next: auxiliary_polys_commitment.map(|c| eval_commitment(zeta_next, c)),
             ctl_zs_first: requires_ctl.then(|| {
