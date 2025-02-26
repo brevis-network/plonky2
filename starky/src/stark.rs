@@ -116,6 +116,20 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     );
 
+    /// Evaluates constraints at a vector of points from the degree `D` extension field with random challenge.
+    /// This is like `eval_ext`, except in the context of a recursive circuit.
+    /// Note: constraints must be added through`yield_constr.constraint(builder, constraint)`
+    /// in the same order as they are given in `eval_packed_generic`.
+    fn eval_ext_with_challenges(
+        &self,
+        builder: &mut CircuitBuilder<F, D>,
+        vars: &Self::EvaluationFrameTarget,
+        p2_vars: Option<&Self::P2EvaluationFrameTarget>,
+        random_gamma: Option<ExtensionTarget<D>>,
+        yield_constr: &mut RecursiveConstraintConsumer<F, D>) {
+
+    }
+
     /// Outputs the maximum constraint degree of this [`Stark`].
     fn constraint_degree(&self) -> usize;
 
@@ -258,13 +272,29 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             blinding: false,
         });
 
+        //todo:: new to remove hardcode when all p2 migration is done
         let p2_trace_info  = if self.use_phase2() {
-            let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-            oracles.push(FriOracleInfo {
-                num_polys: Self::P2_COLUMNS,
-                blinding: false,
-            });
-            p2_trace_polys
+            if Self::name(&self) == "receipt_mpt_stark" || Self::name(&self) == "extension_type_stark" {
+                let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                let p2_trace_polys_2 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
+                p2_trace_polys
+            } else {
+                let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+                oracles.push(FriOracleInfo {
+                    num_polys: Self::P2_COLUMNS,
+                    blinding: false,
+                });
+                p2_trace_polys
+            }
         } else {
             vec![]
         };
@@ -312,8 +342,13 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
+        // todo:: new to remove hardcode when all p2 migration is done
         if self.requires_ctls() {
-            let oracle_index = if self.use_phase2() {2} else {1};
+            let mut oracle_index = if self.use_phase2() {2} else {1};
+            if Self::name(&self) == "receipt_mpt_stark" || Self::name(&self) == "extension_type_stark" {
+                oracle_index  = if self.use_phase2() {3} else {1};
+            }
+            
             let ctl_zs_info = FriPolynomialInfo::from_range(
                 oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helper_polys..num_auxiliary_polys,

@@ -78,7 +78,7 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
     stark: &S,
     vars: &S::EvaluationFrameTarget,
     p2_vars: Option<&[S::P2EvaluationFrameTarget]>,
-    random_gamma: Option<Vec<ExtensionTarget<D>>>,
+    random_gamma: Option<&[ExtensionTarget<D>]>,
     lookup_vars: Option<LookupCheckVarsTarget<D>>,
     ctl_vars: Option<&[CtlCheckVarsTarget<F, D>]>,
     consumer: &mut RecursiveConstraintConsumer<F, D>,
@@ -87,8 +87,15 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
     S: Stark<F, D>,
 {
     // Evaluate all of the STARK's table constraints.
-    // stark.eval_ext_circuit(builder,vars, p2_vars, random_gamma.as_deref(), consumer);
-    stark.eval_ext_circuit(builder,vars, None, None, consumer);
+    let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
+    stark.eval_ext_circuit(builder, vars, p2_vars_0, random_gamma.and_then(|gammas| Some(gammas[0])), consumer);
+
+    if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
+        // debug!("receipt_mpt_stark eval_packed_with_challenge");
+        p2_vars.unwrap().iter().zip(random_gamma.unwrap()).for_each(|(p2_v, g)| {
+            stark.eval_ext_with_challenges(builder, vars, Some(p2_v), Some(*g), consumer);
+        });
+    }
 
     if let Some(lookup_vars) = lookup_vars {
         // Evaluate all of the STARK's constraints related to the permutation argument.
@@ -99,8 +106,7 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
         eval_cross_table_lookup_checks_circuit::<S, F, D>(
             builder,
             vars,
-            // p2_vars,
-            None,
+            p2_vars,
             ctl_vars,
             consumer,
             stark.constraint_degree(),

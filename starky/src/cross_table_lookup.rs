@@ -682,7 +682,6 @@ pub(crate) fn eval_cross_table_lookup_checks<F, FE, P, S, const D: usize, const 
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
 
-    // concat p2_local_values items
     let p2_local_values = p2_vars.and_then(|p2_vars| {
         Some(p2_vars.iter().map(|p2_var| p2_var.get_local_values()).collect::<Vec<_>>())
     });
@@ -894,7 +893,7 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
 >(
     builder: &mut CircuitBuilder<F, D>,
     vars: &S::EvaluationFrameTarget,
-    p2_vars: Option<&S::P2EvaluationFrameTarget>,
+    p2_vars: Option<&[S::P2EvaluationFrameTarget]>,
     ctl_vars: &[CtlCheckVarsTarget<F, D>],
     consumer: &mut RecursiveConstraintConsumer<F, D>,
     constraint_degree: usize,
@@ -902,8 +901,15 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
     let local_values = vars.get_local_values();
     let next_values = vars.get_next_values();
 
-    let p2_local_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_local_values());
-    let p2_next_values = p2_vars.is_some().then(|| p2_vars.unwrap().get_next_values());
+    let p2_local_values = p2_vars.and_then(|p2_vars| {
+        Some(p2_vars.iter().map(|p2_var| p2_var.get_local_values()).collect::<Vec<_>>())
+    });
+    let p2_local_values = p2_local_values.and_then(|p2_local_values| { Some(p2_local_values.concat()) });
+
+    let p2_next_values = p2_vars.and_then(|p2_vars| {
+        Some(p2_vars.iter().map(|p2_var| p2_var.get_next_values()).collect::<Vec<_>>())
+    });
+    let p2_next_values = p2_next_values.and_then(|p2_next_values| { Some(p2_next_values.concat()) });
 
     for lookup_vars in ctl_vars {
         let CtlCheckVarsTarget {
@@ -920,7 +926,7 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             .iter()
             .map(|col| {
                 col.iter()
-                    .map(|c| c.eval_with_next_circuit(builder, local_values, next_values, p2_local_values, p2_next_values))
+                    .map(|c| c.eval_with_next_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref()))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -932,8 +938,8 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             &evals,
             local_values,
             next_values,
-            p2_local_values,
-            p2_next_values,
+            p2_local_values.as_deref(),
+            p2_next_values.as_deref(),
             helper_columns,
             constraint_degree,
             challenges,
@@ -955,8 +961,8 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             let combin0 = challenges.combine_circuit(builder, &evals[0]);
             let combin1 = challenges.combine_circuit(builder, &evals[1]);
 
-            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
-            let f1 = filter[1].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
+            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
+            let f1 = filter[1].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
 
             let combined = builder.mul_sub_extension(combin1, *local_z, f1);
             let combined = builder.mul_extension(combined, combin0);
@@ -969,7 +975,7 @@ pub(crate) fn eval_cross_table_lookup_checks_circuit<
             consumer.constraint_last_row(builder, constr);
         } else {
             let combin0 = challenges.combine_circuit(builder, &evals[0]);
-            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values, p2_next_values);
+            let f0 = filter[0].eval_filter_circuit(builder, local_values, next_values, p2_local_values.as_deref(), p2_next_values.as_deref());
 
             let constr = builder.mul_sub_extension(combin0, *local_z, f0);
             consumer.constraint_last_row(builder, constr);
