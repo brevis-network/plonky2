@@ -165,7 +165,6 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
 
         let p2_trace_info = if self.use_phase2() {
             if Self::name(&self) == "receipt_mpt_stark" || Self::name(&self) == "extension_type_stark" {
-                debug!("receipt_mpt_stark create fri instance");
                 let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
                 oracles.push(FriOracleInfo {
                     num_polys: Self::P2_COLUMNS,

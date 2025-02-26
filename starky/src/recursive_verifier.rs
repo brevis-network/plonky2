@@ -290,12 +290,7 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
     
     let num_leaves_per_oracle = if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
         once(S::COLUMNS)
-        .chain(
-            stark.use_phase2().then(||S::P2_COLUMNS),
-        )
-        .chain(
-            stark.use_phase2().then(||S::P2_COLUMNS),
-        )
+        .chain((0..config.num_challenges).filter_map(|_| stark.use_phase2().then(|| S::P2_COLUMNS)))
         .chain(
             (stark.uses_lookups() || stark.requires_ctls())
                 .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
@@ -324,7 +319,6 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 
     debug!("num_leaves_per_oracle: {:?}", num_leaves_per_oracle);
 
-    
     let p2_trace_caps = if stark.use_phase2() {
         if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
             Some((0..config.num_challenges).map(|_i| builder.add_virtual_cap(cap_height)).collect_vec())

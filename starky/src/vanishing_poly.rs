@@ -1,4 +1,3 @@
-use log::debug;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::hash::hash_types::RichField;
@@ -33,14 +32,14 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
     P: PackedField<Scalar = FE>,
     S: Stark<F, D>,
 {
+    // Evaluate main trace constraints.
+    // TODO: need to remove gamma arg to the eval_packed_generic when all eval_packed_generic are migrated.
     let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
     stark.eval_packed_generic(vars,  p2_vars_0.as_deref(), random_gamma.and_then(|gammas| Some(&gammas[0])), consumer);
 
-    // Evaluate all of the STARK's table constraints.
-    if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
-
-        // debug!("receipt_mpt_stark eval_packed_with_challenge");
-        p2_vars.unwrap().iter().zip(random_gamma.unwrap()).for_each(|(v, g)| {
+    // Evaluate p2 trace constraints according to the num_challenges.
+    if let Some(p2_vars) = p2_vars {
+        p2_vars.iter().zip(random_gamma.unwrap()).for_each(|(v, g)| {
             stark.eval_packed_with_challenge(vars, Some(v), Some(g), consumer);
         });
     }
@@ -86,13 +85,15 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
     F: RichField + Extendable<D>,
     S: Stark<F, D>,
 {
-    // Evaluate all of the STARK's table constraints.
+
+    // Evaluate main trace constraints.
+    // TODO: need to remove gamma arg to the eval_packed_generic when all eval_packed_generic are migrated.
     let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
     stark.eval_ext_circuit(builder, vars, p2_vars_0, random_gamma.and_then(|gammas| Some(gammas[0])), consumer);
 
-    if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
-        // debug!("receipt_mpt_stark eval_packed_with_challenge");
-        p2_vars.unwrap().iter().zip(random_gamma.unwrap()).for_each(|(p2_v, g)| {
+    // Evaluate p2 trace constraints according to the num_challenges.
+    if let Some(p2_vars) = p2_vars {
+        p2_vars.iter().zip(random_gamma.unwrap()).for_each(|(p2_v, g)| {
             stark.eval_ext_with_challenges(builder, vars, Some(p2_v), Some(*g), consumer);
         });
     }
