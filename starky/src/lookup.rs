@@ -137,6 +137,8 @@ impl<F: Field> Filter<F> {
 /// - the constant of the linear combination.
 #[derive(Clone, Debug)]
 pub struct Column<F: Field> {
+    /// the column index in a row.
+    pub offset: usize,
     linear_combination: Vec<(usize, F)>,
     next_row_linear_combination: Vec<(usize, F)>,
     constant: F,
@@ -146,6 +148,7 @@ impl<F: Field> Column<F> {
     /// Returns the representation of a single column in the current row.
     pub fn single(c: usize) -> Self {
         Self {
+            offset: c,
             linear_combination: vec![(c, F::ONE)],
             next_row_linear_combination: vec![],
             constant: F::ZERO,
@@ -159,9 +162,18 @@ impl<F: Field> Column<F> {
         cs.into_iter().map(|c| Self::single(*c.borrow()))
     }
 
+    /// Returns multiple single columns in the current row, auto adding the p2 columns twice
+    pub fn singles_p2_expand<I: IntoIterator<Item = impl Borrow<usize>>>(
+        main_cols: usize,
+        cs: I,
+    ) -> impl Iterator<Item = Self> {
+        cs.into_iter().map(|c| Self::single(*c.borrow()))
+    }
+
     /// Returns the representation of a single column in the next row.
     pub fn single_next_row(c: usize) -> Self {
         Self {
+            offset: c,
             linear_combination: vec![],
             next_row_linear_combination: vec![(c, F::ONE)],
             constant: F::ZERO,
@@ -178,6 +190,7 @@ impl<F: Field> Column<F> {
     /// Returns a linear combination corresponding to a constant.
     pub fn constant(constant: F) -> Self {
         Self {
+            offset: 0,
             linear_combination: vec![],
             next_row_linear_combination: vec![],
             constant,
@@ -212,6 +225,7 @@ impl<F: Field> Column<F> {
         );
 
         Self {
+            offset: 0,
             linear_combination: v,
             next_row_linear_combination: vec![],
             constant,
@@ -246,6 +260,7 @@ impl<F: Field> Column<F> {
         }
 
         Self {
+            offset: 0,
             linear_combination: v,
             next_row_linear_combination: next_row_v,
             constant,

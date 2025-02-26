@@ -33,6 +33,9 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
     P: PackedField<Scalar = FE>,
     S: Stark<F, D>,
 {
+    let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
+    stark.eval_packed_generic(vars,  p2_vars_0.as_deref(), random_gamma.and_then(|gammas| Some(&gammas[0])), consumer);
+
     // Evaluate all of the STARK's table constraints.
     if stark.name() == "receipt_mpt_stark" || stark.name() == "extension_type_stark" {
 
@@ -40,11 +43,8 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
         p2_vars.unwrap().iter().zip(random_gamma.unwrap()).for_each(|(v, g)| {
             stark.eval_packed_with_challenge(vars, Some(v), Some(g), consumer);
         });
-    } else {
-        let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
-        stark.eval_packed_generic(vars,  p2_vars_0.as_deref(), random_gamma.and_then(|gammas| Some(&gammas[0])), consumer);
     }
-
+    
     if let Some(lookup_vars) = lookup_vars {
         // Evaluate the STARK constraints related to the permutation arguments.
         eval_packed_lookups_generic::<F, FE, P, S, D, D2>(

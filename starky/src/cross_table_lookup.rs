@@ -30,6 +30,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
+use log::debug;
 use core::cmp::min;
 use core::fmt::Debug;
 use core::iter::once;
@@ -77,6 +78,27 @@ impl<F: Field> TableWithColumns<F> {
         Self {
             table,
             columns,
+            filter,
+        }
+    }
+
+     /// Generates a new `TableWithColumns` given a `table` index, a linear combination of columns `columns` and a `filter`.
+     pub fn new_expand(table: TableIdx, main_table_size: usize, p2_table_size: usize, columns: Vec<Column<F>>, filter: Filter<F>) -> Self {
+        let mut expand_columns = Vec::new();
+        // extends all columns declared
+        expand_columns.extend(columns.clone());
+
+        // find the col in the p2 table and add it to the columns
+        columns.iter().for_each(|base_col| {
+            if base_col.offset >= main_table_size { //  p2 columns exsists
+                let new_col_offset = base_col.offset + p2_table_size;
+                debug!("new_col_offset: {:?}", new_col_offset);
+                expand_columns.push(Column::single(new_col_offset));
+            }
+         });
+        Self {
+            table,
+            columns:expand_columns,
             filter,
         }
     }
@@ -238,7 +260,7 @@ where
 {
     // Get challenges for the cross-table lookups.
     let ctl_challenges = get_grand_product_challenge_set(challenger, config.num_challenges);
-
+    
     // For each STARK, compute its cross-table lookup Z polynomials
     // and get the associated `CtlData`.
     let ctl_data = cross_table_lookup_data::<F, D, N>(
