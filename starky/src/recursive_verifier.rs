@@ -290,7 +290,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
     
     let num_leaves_per_oracle = if stark.name() == "receipt_mpt_stark" 
         || stark.name() == "extension_type_stark" 
-        || stark.name() == "gamma_exp_stark" {
+        || stark.name() == "gamma_exp_stark"
+        || stark.name() == "receipt_decode_stark" {
         once(S::COLUMNS)
         .chain((0..config.num_challenges).filter_map(|_| stark.use_phase2().then(|| S::P2_COLUMNS)))
         .chain(
@@ -324,7 +325,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
     let p2_trace_caps = if stark.use_phase2() {
         if stark.name() == "receipt_mpt_stark" 
         || stark.name() == "extension_type_stark"
-        || stark.name() == "gamma_exp_stark" {
+        || stark.name() == "gamma_exp_stark"
+        || stark.name() == "receipt_decode_stark" {
             Some((0..config.num_challenges).map(|_i| builder.add_virtual_cap(cap_height)).collect_vec())
         } else {
             Some(vec![builder.add_virtual_cap(cap_height)])
@@ -370,7 +372,8 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
             .then(|| {
                 if stark.name() == "receipt_mpt_stark" 
                 || stark.name() == "extension_type_stark"
-                || stark.name() == "gamma_exp_stark" {
+                || stark.name() == "gamma_exp_stark"
+                || stark.name() == "receipt_decode_stark" {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
                 } else {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS)
@@ -381,7 +384,8 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
             .then(|| {
                 if stark.name() == "receipt_mpt_stark" 
                 || stark.name() == "extension_type_stark"
-                || stark.name() == "gamma_exp_stark" {
+                || stark.name() == "gamma_exp_stark"
+                || stark.name() == "receipt_decode_stark" {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
                 } else {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS)
