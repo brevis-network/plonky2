@@ -294,7 +294,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
         || stark.name() == "receipt_decode_stark"
         || stark.name() == "log_decode_stark"
         || stark.name() == "block_header_decode_stark"
-        || stark.name() == "smt_inclusion_stark" {
+        || stark.name() == "smt_inclusion_stark"
+        || stark.name() == "path_stark" {
         once(S::COLUMNS)
         .chain((0..config.num_challenges).filter_map(|_| stark.use_phase2().then(|| S::P2_COLUMNS)))
         .chain(
@@ -332,7 +333,8 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
         || stark.name() == "receipt_decode_stark"
         || stark.name() == "log_decode_stark"
         || stark.name() == "block_header_decode_stark"
-        || stark.name() == "smt_inclusion_stark" {
+        || stark.name() == "smt_inclusion_stark"
+        || stark.name() == "path_stark" {
             Some((0..config.num_challenges).map(|_i| builder.add_virtual_cap(cap_height)).collect_vec())
         } else {
             Some(vec![builder.add_virtual_cap(cap_height)])
@@ -382,7 +384,8 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
                 || stark.name() == "receipt_decode_stark"
                 || stark.name() == "log_decode_stark"
                 || stark.name() == "block_header_decode_stark"
-                || stark.name() == "smt_inclusion_stark" {
+                || stark.name() == "smt_inclusion_stark"
+                || stark.name() == "path_stark" {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
                 } else {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS)
@@ -397,7 +400,8 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
                 || stark.name() == "receipt_decode_stark"
                 || stark.name() == "log_decode_stark"
                 || stark.name() == "block_header_decode_stark"
-                || stark.name() == "smt_inclusion_stark" {
+                || stark.name() == "smt_inclusion_stark"
+                || stark.name() == "path_stark" {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
                 } else {
                     builder.add_virtual_extension_targets(S::P2_COLUMNS)
