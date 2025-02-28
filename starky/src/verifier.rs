@@ -285,7 +285,8 @@ where
         || stark.name() == "extension_type_stark" 
         || stark.name() == "gamma_exp_stark" 
         || stark.name() == "receipt_decode_stark"
-        || stark.name() == "log_decode_stark" {
+        || stark.name() == "log_decode_stark"
+        || stark.name() == "block_header_decode_stark" {
             ensure!(p2_local_values.len() == S::P2_COLUMNS * config.num_challenges);
             ensure!(p2_next_values.len() == S::P2_COLUMNS * config.num_challenges);
         } else {
