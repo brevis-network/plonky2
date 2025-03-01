@@ -288,7 +288,8 @@ where
         || stark.name() == "log_decode_stark"
         || stark.name() == "block_header_decode_stark"
         || stark.name() == "smt_inclusion_stark"
-        || stark.name() == "path_stark" {
+        || stark.name() == "path_stark"
+        || stark.name() == "keccak_sponge_stark" {
             ensure!(p2_local_values.len() == S::P2_COLUMNS * config.num_challenges);
             ensure!(p2_next_values.len() == S::P2_COLUMNS * config.num_challenges);
         } else {

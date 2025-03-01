@@ -171,7 +171,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             || Self::name(&self) == "log_decode_stark"
             || Self::name(&self) == "block_header_decode_stark"
             || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark" {
+            || Self::name(&self) == "path_stark"
+            || Self::name(&self) == "keccak_sponge_stark" {
                 let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
                 oracles.push(FriOracleInfo {
                     num_polys: Self::P2_COLUMNS,
@@ -250,7 +251,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             || Self::name(&self) == "log_decode_stark"
             || Self::name(&self) == "block_header_decode_stark"
             || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark" {
+            || Self::name(&self) == "path_stark"
+            || Self::name(&self) == "keccak_sponge_stark" {
                 oracle_index  = if self.use_phase2() {3} else {1};
             }
             let ctl_zs_info = FriPolynomialInfo::from_range(
@@ -294,7 +296,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             || Self::name(&self) == "log_decode_stark"
             || Self::name(&self) == "block_header_decode_stark"
             || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark" {
+            || Self::name(&self) == "path_stark"
+            || Self::name(&self) == "keccak_sponge_stark" {
                 let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
                 oracles.push(FriOracleInfo {
                     num_polys: Self::P2_COLUMNS,
@@ -372,7 +375,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
             || Self::name(&self) == "log_decode_stark"
             || Self::name(&self) == "block_header_decode_stark"
             || Self::name(&self) == "smt_inclusion_stark" 
-            || Self::name(&self) == "path_stark"{
+            || Self::name(&self) == "path_stark" 
+            || Self::name(&self) == "keccak_sponge_stark" {
                 oracle_index  = if self.use_phase2() {3} else {1};
             }
             
