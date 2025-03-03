@@ -56,7 +56,7 @@ use crate::lookup::{
     eval_helper_columns, eval_helper_columns_circuit, get_grand_product_challenge_set,
     get_helper_cols, Column, ColumnFilter, Filter, GrandProductChallenge, GrandProductChallengeSet,
 };
-use crate::proof::{MultiProof, StarkProofTarget, StarkProofWithMetadata, StarkProofWithPublicInputs};
+use crate::proof::{StarkProofTarget, StarkProofWithMetadata};
 use crate::stark::Stark;
 
 /// An alias for `usize`, to represent the index of a STARK table in a multi-STARK setting.

@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use log::debug;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::polynomial::PolynomialCoeffs;
 use plonky2::fri::proof::{FriProof, FriProofTarget};
@@ -6,7 +6,6 @@ use plonky2::gadgets::polynomial::PolynomialCoeffsExtTarget;
 use plonky2::hash::hash_types::{MerkleCapTarget, RichField};
 use plonky2::hash::merkle_tree::MerkleCap;
 use plonky2::iop::challenger::{Challenger, RecursiveChallenger};
-use plonky2::iop::ext_target::ExtensionTarget;
 use plonky2::iop::target::Target;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig};
@@ -49,19 +48,22 @@ where
         challenger.observe_cap(cap);
     }
 
-    let random_gammas = &p2_trace_caps.and_then(|p2_trace_caps| {
-        let mut gammas = vec![];
+    // sample random gammas
+    let random_gammas = &p2_trace_caps.clone().and_then(|_p2_trace_caps| {
+        let gammas = challenger.get_n_challenges(D);
+        let ext_gammas = gammas
+            .iter()
+            .map(|gamma| F::Extension::from_basefield(*gamma))
+            .collect::<Vec<F::Extension>>();
+        Some(ext_gammas)
+    });
 
+    // observe p2 trace caps
+    if let Some(p2_trace_caps) = p2_trace_caps {
         p2_trace_caps.iter().for_each(|p2_trace_cap| {
-            // sample random gamma
-            let random_f = challenger.get_challenge();
-            gammas.push( F::Extension::from_basefield(random_f));
-
-            // observe trace cap
             challenger.observe_cap(p2_trace_cap);
         });
-        Some(gammas)
-    });
+    }
 
     let lookup_challenge_set = if let Some(&challenges) = challenges.as_ref() {
         Some(challenges.clone())

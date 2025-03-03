@@ -281,15 +281,7 @@ where
     ensure!(next_values.len() == S::COLUMNS);
 
     if let (Some(p2_local_values), Some(p2_next_values)) = (p2_local_values, p2_next_values) {
-        if stark.name() == "receipt_mpt_stark" 
-        || stark.name() == "extension_type_stark" 
-        || stark.name() == "gamma_exp_stark" 
-        || stark.name() == "receipt_decode_stark"
-        || stark.name() == "log_decode_stark"
-        || stark.name() == "block_header_decode_stark"
-        || stark.name() == "smt_inclusion_stark"
-        || stark.name() == "path_stark"
-        || stark.name() == "keccak_sponge_stark" {
+        if stark.use_phase2() {
             ensure!(p2_local_values.len() == S::P2_COLUMNS * config.num_challenges);
             ensure!(p2_next_values.len() == S::P2_COLUMNS * config.num_challenges);
         } else {
