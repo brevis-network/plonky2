@@ -33,9 +33,8 @@ pub(crate) fn eval_vanishing_poly<F, FE, P, S, const D: usize, const D2: usize>(
     S: Stark<F, D>,
 {
     // Evaluate main trace constraints.
-    // TODO: need to remove gamma arg to the eval_packed_generic when all eval_packed_generic are migrated.
     let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
-    stark.eval_packed_generic(vars,  p2_vars_0.as_deref(), random_gamma.and_then(|gammas| Some(&gammas[0])), consumer);
+    stark.eval_packed_generic(vars,  p2_vars_0.as_deref(), consumer);
 
     // Evaluate p2 trace constraints according to the num_challenges.
     if let Some(p2_vars) = p2_vars {
@@ -87,9 +86,8 @@ pub(crate) fn eval_vanishing_poly_circuit<F, S, const D: usize>(
 {
 
     // Evaluate main trace constraints.
-    // TODO: need to remove gamma arg to the eval_packed_generic when all eval_packed_generic are migrated.
     let p2_vars_0 = p2_vars.clone().and_then(|vars|Some(&vars[0]));
-    stark.eval_ext_circuit(builder, vars, p2_vars_0, random_gamma.and_then(|gammas| Some(gammas[0])), consumer);
+    stark.eval_ext_circuit(builder, vars, p2_vars_0, consumer);
 
     // Evaluate p2 trace constraints according to the num_challenges.
     if let Some(p2_vars) = p2_vars {

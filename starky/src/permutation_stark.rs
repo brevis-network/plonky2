@@ -63,7 +63,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
     type EvaluationFrameTarget =
         StarkFrame<ExtensionTarget<D>, ExtensionTarget<D>, PERM_COLUMNS, PERM_PUBLIC_INPUTS>;
 
-    type P2EvaluationFrame<FE, P, const D2: usize> where FE: FieldExtension<D2, BaseField=F>, P: PackedField<Scalar=FE> = StarkFrame<P, P::Scalar, 0, 0>;
+    type P2EvaluationFrame<FE, P, const D2: usize>  = StarkFrame<P, P::Scalar, 0, 0> where FE: FieldExtension<D2, BaseField = F>, P: PackedField<Scalar = FE>;
     type P2EvaluationFrameTarget = StarkFrame<
         ExtensionTarget<D>,
         ExtensionTarget<D>,
@@ -89,7 +89,6 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
         p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
-        random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
@@ -103,7 +102,6 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for PermutationSt
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
         p2_vars: Option<&Self::P2EvaluationFrameTarget>,
-        random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
     }

@@ -4,7 +4,6 @@
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
 
-use log::debug;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
 use plonky2::field::types::Field;
@@ -66,7 +65,6 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
         p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
-        random_gamma: Option<&FE>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
@@ -91,7 +89,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F, P, 1>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) {
-        self.eval_packed_generic(vars, None, None, yield_constr)
+        self.eval_packed_generic(vars, None, yield_constr)
     }
 
     /// Evaluates constraints at a single point from the degree `D` extension field.
@@ -100,7 +98,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrame<F::Extension, F::Extension, D>,
         yield_constr: &mut ConstraintConsumer<F::Extension>,
     ) {
-        self.eval_packed_generic(vars, None, None, yield_constr)
+        self.eval_packed_generic(vars, None, yield_constr)
     }
 
     /// Evaluates constraints at a vector of points from the degree `D` extension field.
@@ -112,7 +110,6 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
         p2_vars: Option<&Self::P2EvaluationFrameTarget>,
-        random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     );
 

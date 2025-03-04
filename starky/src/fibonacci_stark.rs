@@ -72,7 +72,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         FIBONACCI_COLUMNS,
         FIBONACCI_PUBLIC_INPUTS,
     >;
-    type P2EvaluationFrame<FE, P, const D2: usize> where FE: FieldExtension<D2, BaseField=F>, P: PackedField<Scalar=FE> = StarkFrame<P, P::Scalar, 0, 0>;
+    type P2EvaluationFrame<FE, P, const D2: usize>  = StarkFrame<P, P::Scalar, 0, 0> where FE: FieldExtension<D2, BaseField = F>, P: PackedField<Scalar = FE>;
     type P2EvaluationFrameTarget = StarkFrame<
         ExtensionTarget<D>,
         ExtensionTarget<D>,
@@ -84,8 +84,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
     fn eval_packed_generic<FE, P, const D2: usize>(
         &self,
         vars: &Self::EvaluationFrame<FE, P, D2>,
-        p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
-        random_gamma: Option<&FE>,
+        _p2_vars: Option<&Self::P2EvaluationFrame<FE, P, D2>>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
@@ -111,7 +110,6 @@ impl<F: RichField + Extendable<D>, const D: usize> Stark<F, D> for FibonacciStar
         builder: &mut CircuitBuilder<F, D>,
         vars: &Self::EvaluationFrameTarget,
         _p2_vars: Option<&Self::P2EvaluationFrameTarget>,
-        _random_gamma: Option<ExtensionTarget<D>>,
         yield_constr: &mut RecursiveConstraintConsumer<F, D>,
     ) {
         let local_values = vars.get_local_values();
@@ -155,11 +153,11 @@ mod tests {
     use plonky2::plonk::circuit_builder::CircuitBuilder;
     use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData, VerifierOnlyCircuitData};
     use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, PoseidonGoldilocksConfig};
-    use plonky2::plonk::proof::{ProofWithPublicInputs};
+    use plonky2::plonk::proof::ProofWithPublicInputs;
     use plonky2::plonk::wrapper::plonky2_config::PoseidonBN128GoldilocksConfig;
     use plonky2::util::timing::TimingTree;
 
-    use std::time::{Duration, Instant};
+    use std::time::Instant;
 
     use crate::config::StarkConfig;
     use crate::fibonacci_stark::FibonacciStark;
