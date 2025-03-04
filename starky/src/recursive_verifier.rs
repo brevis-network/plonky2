@@ -3,11 +3,11 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use log::debug;
 use core::iter::once;
 
 use anyhow::{ensure, Result};
 use itertools::Itertools;
+use log::debug;
 use plonky2::field::extension::Extendable;
 use plonky2::field::types::Field;
 use plonky2::fri::witness_util::set_fri_proof_target;
@@ -117,14 +117,16 @@ pub fn verify_stark_proof_with_challenges_circuit<
     let p2_vars = if stark.use_phase2() {
         p2_local_values.clone().and_then(|p2_local_values| {
             let p2_next_values = p2_next_values.as_ref().unwrap();
-            let frame_len = p2_local_values.len()/S::P2_COLUMNS;
-            let frames = (0..frame_len).map(|i| {
-                S::P2EvaluationFrameTarget::from_values(
-                    &p2_local_values[i*S::P2_COLUMNS..(i+1)*S::P2_COLUMNS],
-                    &p2_next_values[i*S::P2_COLUMNS..(i+1)*S::P2_COLUMNS],
-                    &[],
-                )
-            }).collect_vec();
+            let frame_len = p2_local_values.len() / S::P2_COLUMNS;
+            let frames = (0..frame_len)
+                .map(|i| {
+                    S::P2EvaluationFrameTarget::from_values(
+                        &p2_local_values[i * S::P2_COLUMNS..(i + 1) * S::P2_COLUMNS],
+                        &p2_next_values[i * S::P2_COLUMNS..(i + 1) * S::P2_COLUMNS],
+                        &[],
+                    )
+                })
+                .collect_vec();
             Some(frames)
         })
     } else {
@@ -226,7 +228,6 @@ pub fn verify_stark_proof_with_challenges_circuit<
     );
 
     debug!("[recursion] verify_fri_proof done");
-
 }
 
 fn eval_l_0_and_l_last_circuit<F: RichField + Extendable<D>, const D: usize>(
@@ -287,60 +288,44 @@ pub fn add_virtual_stark_proof<F: RichField + Extendable<D>, S: Stark<F, D>, con
 ) -> StarkProofTarget<D> {
     let fri_params = config.fri_params(degree_bits);
     let cap_height = fri_params.config.cap_height;
-    
-    let num_leaves_per_oracle = if stark.name() == "receipt_mpt_stark" 
-        || stark.name() == "extension_type_stark" 
-        || stark.name() == "gamma_exp_stark"
-        || stark.name() == "receipt_decode_stark"
-        || stark.name() == "log_decode_stark"
-        || stark.name() == "block_header_decode_stark"
-        || stark.name() == "smt_inclusion_stark"
-        || stark.name() == "path_stark"
-        || stark.name() == "keccak_sponge_stark" {
+
+    let num_leaves_per_oracle = if stark.use_phase2() {
         once(S::COLUMNS)
-        .chain((0..config.num_challenges).filter_map(|_| stark.use_phase2().then(|| S::P2_COLUMNS)))
-        .chain(
-            (stark.uses_lookups() || stark.requires_ctls())
-                .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
-        )
-        .chain(
-            (stark.quotient_degree_factor() > 0)
-                .then(|| stark.quotient_degree_factor() * config.num_challenges),
-        )
-        .collect_vec()
+            .chain(
+                (0..config.num_challenges)
+                    .filter_map(|_| stark.use_phase2().then(|| S::P2_COLUMNS)),
+            )
+            .chain(
+                (stark.uses_lookups() || stark.requires_ctls())
+                    .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
+            )
+            .chain(
+                (stark.quotient_degree_factor() > 0)
+                    .then(|| stark.quotient_degree_factor() * config.num_challenges),
+            )
+            .collect_vec()
     } else {
         once(S::COLUMNS)
-        .chain(
-            stark.use_phase2().then(||S::P2_COLUMNS),
-        )
-        .chain(
-            (stark.uses_lookups() || stark.requires_ctls())
-                .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
-        )
-        .chain(
-            (stark.quotient_degree_factor() > 0)
-                .then(|| stark.quotient_degree_factor() * config.num_challenges),
-        )
-        .collect_vec()
+            .chain(stark.use_phase2().then(|| S::P2_COLUMNS))
+            .chain(
+                (stark.uses_lookups() || stark.requires_ctls())
+                    .then(|| stark.num_lookup_helper_columns(config) + num_ctl_helper_zs),
+            )
+            .chain(
+                (stark.quotient_degree_factor() > 0)
+                    .then(|| stark.quotient_degree_factor() * config.num_challenges),
+            )
+            .collect_vec()
     };
-
 
     debug!("num_leaves_per_oracle: {:?}", num_leaves_per_oracle);
 
     let p2_trace_caps = if stark.use_phase2() {
-        if stark.name() == "receipt_mpt_stark" 
-        || stark.name() == "extension_type_stark"
-        || stark.name() == "gamma_exp_stark"
-        || stark.name() == "receipt_decode_stark"
-        || stark.name() == "log_decode_stark"
-        || stark.name() == "block_header_decode_stark"
-        || stark.name() == "smt_inclusion_stark"
-        || stark.name() == "path_stark"
-        || stark.name() == "keccak_sponge_stark" {
-            Some((0..config.num_challenges).map(|_i| builder.add_virtual_cap(cap_height)).collect_vec())
-        } else {
-            Some(vec![builder.add_virtual_cap(cap_height)])
-        }         
+        Some(
+            (0..config.num_challenges)
+                .map(|_i| builder.add_virtual_cap(cap_height))
+                .collect_vec(),
+        )
     } else {
         None
     };
@@ -377,40 +362,13 @@ fn add_virtual_stark_opening_set<F: RichField + Extendable<D>, S: Stark<F, D>, c
     StarkOpeningSetTarget {
         local_values: builder.add_virtual_extension_targets(S::COLUMNS),
         next_values: builder.add_virtual_extension_targets(S::COLUMNS),
-        p2_local_values: (stark
-            .use_phase2()
-            .then(|| {
-                if stark.name() == "receipt_mpt_stark" 
-                || stark.name() == "extension_type_stark"
-                || stark.name() == "gamma_exp_stark"
-                || stark.name() == "receipt_decode_stark"
-                || stark.name() == "log_decode_stark"
-                || stark.name() == "block_header_decode_stark"
-                || stark.name() == "smt_inclusion_stark"
-                || stark.name() == "path_stark"
-                || stark.name() == "keccak_sponge_stark" {
-                    builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
-                } else {
-                    builder.add_virtual_extension_targets(S::P2_COLUMNS)
-                }
-            })),
-        p2_next_values: (stark
-            .use_phase2()
-            .then(|| {
-                if stark.name() == "receipt_mpt_stark" 
-                || stark.name() == "extension_type_stark"
-                || stark.name() == "gamma_exp_stark"
-                || stark.name() == "receipt_decode_stark"
-                || stark.name() == "log_decode_stark"
-                || stark.name() == "block_header_decode_stark"
-                || stark.name() == "smt_inclusion_stark"
-                || stark.name() == "path_stark"
-                || stark.name() == "keccak_sponge_stark" {
-                    builder.add_virtual_extension_targets(S::P2_COLUMNS*config.num_challenges)
-                } else {
-                    builder.add_virtual_extension_targets(S::P2_COLUMNS)
-            }
-            })),
+        p2_local_values: (stark.use_phase2().then(|| {
+            builder.add_virtual_extension_targets(S::P2_COLUMNS * config.num_challenges)
+        })),
+        p2_next_values: (stark.use_phase2().then(|| {
+            builder.add_virtual_extension_targets(S::P2_COLUMNS * config.num_challenges)
+            
+        })),
         auxiliary_polys: (stark.uses_lookups() || stark.requires_ctls()).then(|| {
             builder.add_virtual_extension_targets(
                 stark.num_lookup_helper_columns(config) + num_ctl_helper_zs,
@@ -474,9 +432,14 @@ pub fn set_stark_proof_target<F, C: GenericConfig<D, F = F>, W, const D: usize>(
     W: WitnessWrite<F>,
 {
     witness.set_cap_target(&proof_target.trace_cap, &proof.trace_cap);
-    if let (Some(p2_target_trace_caps), Some(p2_trace_caps)) = (&proof_target.p2_trace_caps, &proof.p2_trace_caps) {
+    if let (Some(p2_target_trace_caps), Some(p2_trace_caps)) =
+        (&proof_target.p2_trace_caps, &proof.p2_trace_caps)
+    {
         // p2_target_trace_caps.into_iter().zip(p2_trace_caps).for_each(|(t, c)| witness.set_cap_target(t, c));
-        for (t, c) in p2_target_trace_caps.into_iter().zip_eq(p2_trace_caps.into_iter()) {
+        for (t, c) in p2_target_trace_caps
+            .into_iter()
+            .zip_eq(p2_trace_caps.into_iter())
+        {
             witness.set_cap_target(t, c);
         }
         debug!("set p2 target trace cap done");
@@ -503,7 +466,6 @@ pub fn set_stark_proof_target<F, C: GenericConfig<D, F = F>, W, const D: usize>(
     set_fri_proof_target(witness, &proof_target.opening_proof, &proof.opening_proof);
 
     debug!("set fri proof target done");
-
 }
 
 /// Utility function to check that all lookups data wrapped in `Option`s are `Some` iff

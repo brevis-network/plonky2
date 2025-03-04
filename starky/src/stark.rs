@@ -3,6 +3,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
+
 use log::debug;
 use plonky2::field::extension::{Extendable, FieldExtension};
 use plonky2::field::packed::PackedField;
@@ -17,9 +18,8 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 
 use crate::config::StarkConfig;
 use crate::constraint_consumer::{ConstraintConsumer, RecursiveConstraintConsumer};
-use crate::evaluation_frame::{StarkEvaluationFrame};
+use crate::evaluation_frame::StarkEvaluationFrame;
 use crate::lookup::{Column, Filter, Lookup};
-
 
 /// Represents a STARK system.
 pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
@@ -46,8 +46,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     type P2EvaluationFrame<FE, P, const D2: usize>: StarkEvaluationFrame<P, FE>
     where
         FE: FieldExtension<D2, BaseField = F>,
-        P: PackedField<Scalar = FE> ;
-
+        P: PackedField<Scalar = FE>;
 
     /// The `Target` version of `Self::EvaluationFrame`, used to evaluate phase 2 constraints recursively.
     type P2EvaluationFrameTarget: StarkEvaluationFrame<ExtensionTarget<D>, ExtensionTarget<D>>;
@@ -82,16 +81,17 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         yield_constr: &mut ConstraintConsumer<P>,
     ) where
         FE: FieldExtension<D2, BaseField = F>,
-        P: PackedField<Scalar = FE> {
+        P: PackedField<Scalar = FE>,
+    {
     }
-    
+
     /// Evaluates constraints at a vector of points from the base field `F`.
     fn eval_packed_base<P: PackedField<Scalar = F>>(
         &self,
         vars: &Self::EvaluationFrame<F, P, 1>,
         yield_constr: &mut ConstraintConsumer<P>,
     ) {
-        self.eval_packed_generic(vars,None, None, yield_constr)
+        self.eval_packed_generic(vars, None, None, yield_constr)
     }
 
     /// Evaluates constraints at a single point from the degree `D` extension field.
@@ -126,8 +126,8 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         vars: &Self::EvaluationFrameTarget,
         p2_vars: Option<&Self::P2EvaluationFrameTarget>,
         random_gamma: Option<ExtensionTarget<D>>,
-        yield_constr: &mut RecursiveConstraintConsumer<F, D>) {
-
+        yield_constr: &mut RecursiveConstraintConsumer<F, D>,
+    ) {
     }
 
     /// Outputs the maximum constraint degree of this [`Stark`].
@@ -164,37 +164,21 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         });
 
         let p2_trace_info = if self.use_phase2() {
-            if Self::name(&self) == "receipt_mpt_stark" 
-            || Self::name(&self) == "extension_type_stark" 
-            || Self::name(&self) == "gamma_exp_stark"
-            || Self::name(&self) == "receipt_decode_stark"
-            || Self::name(&self) == "log_decode_stark"
-            || Self::name(&self) == "block_header_decode_stark"
-            || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark"
-            || Self::name(&self) == "keccak_sponge_stark" {
-                let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                let p2_trace_polys_2 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
-                p2_trace_polys
-            } else {
-                let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                p2_trace_polys
-            }
-            
-        } else { 
+            let p2_trace_polys_1 =
+                FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            let p2_trace_polys_2 =
+                FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
+            p2_trace_polys
+        } else {
             vec![]
         };
 
@@ -242,19 +226,7 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
         if self.requires_ctls() {
-            let mut oracle_index: usize = if self.use_phase2() {2} else {1};
-
-            if Self::name(&self) == "receipt_mpt_stark" 
-            || Self::name(&self) == "extension_type_stark" 
-            || Self::name(&self) == "gamma_exp_stark" 
-            || Self::name(&self) == "receipt_decode_stark"
-            || Self::name(&self) == "log_decode_stark"
-            || Self::name(&self) == "block_header_decode_stark"
-            || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark"
-            || Self::name(&self) == "keccak_sponge_stark" {
-                oracle_index  = if self.use_phase2() {3} else {1};
-            }
+            let oracle_index: usize = if self.use_phase2() { 3 } else { 1 };
             let ctl_zs_info = FriPolynomialInfo::from_range(
                 oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helpers..num_auxiliary_polys,
@@ -288,36 +260,21 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
         });
 
         //todo:: new to remove hardcode when all p2 migration is done
-        let p2_trace_info  = if self.use_phase2() {
-            if Self::name(&self) == "receipt_mpt_stark" 
-            || Self::name(&self) == "extension_type_stark" 
-            || Self::name(&self) == "gamma_exp_stark" 
-            || Self::name(&self) == "receipt_decode_stark" 
-            || Self::name(&self) == "log_decode_stark"
-            || Self::name(&self) == "block_header_decode_stark"
-            || Self::name(&self) == "smt_inclusion_stark"
-            || Self::name(&self) == "path_stark"
-            || Self::name(&self) == "keccak_sponge_stark" {
-                let p2_trace_polys_1 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                let p2_trace_polys_2 = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
-                p2_trace_polys
-            } else {
-                let p2_trace_polys = FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
-                oracles.push(FriOracleInfo {
-                    num_polys: Self::P2_COLUMNS,
-                    blinding: false,
-                });
-                p2_trace_polys
-            }
+        let p2_trace_info = if self.use_phase2() {
+            let p2_trace_polys_1 =
+                FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            let p2_trace_polys_2 =
+                FriPolynomialInfo::from_range(oracles.len(), 0..Self::P2_COLUMNS);
+            oracles.push(FriOracleInfo {
+                num_polys: Self::P2_COLUMNS,
+                blinding: false,
+            });
+            let p2_trace_polys = vec![p2_trace_polys_1, p2_trace_polys_2].concat();
+            p2_trace_polys
         } else {
             vec![]
         };
@@ -365,21 +322,9 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
 
         let mut batches = vec![zeta_batch, zeta_next_batch];
 
-        // todo:: new to remove hardcode when all p2 migration is done
         if self.requires_ctls() {
-            let mut oracle_index = if self.use_phase2() {2} else {1};
-            if Self::name(&self) == "receipt_mpt_stark" 
-            || Self::name(&self) == "extension_type_stark" 
-            || Self::name(&self) == "gamma_exp_stark"
-            || Self::name(&self) == "receipt_decode_stark"
-            || Self::name(&self) == "log_decode_stark"
-            || Self::name(&self) == "block_header_decode_stark"
-            || Self::name(&self) == "smt_inclusion_stark" 
-            || Self::name(&self) == "path_stark" 
-            || Self::name(&self) == "keccak_sponge_stark" {
-                oracle_index  = if self.use_phase2() {3} else {1};
-            }
-            
+            let oracle_index = if self.use_phase2() { 3 } else { 1 };
+
             let ctl_zs_info = FriPolynomialInfo::from_range(
                 oracle_index, // auxiliary oracle index
                 num_lookup_columns + num_ctl_helper_polys..num_auxiliary_polys,
@@ -409,7 +354,6 @@ pub trait Stark<F: RichField + Extendable<D>, const D: usize>: Sync {
     fn ctl_filter(&self) -> Filter<F> {
         Filter::default()
     }
-
 
     /// Outputs the number of total lookup helper columns, based on this STARK's vector
     /// of [`Lookup`] and the number of challenges used by this [`StarkConfig`].
